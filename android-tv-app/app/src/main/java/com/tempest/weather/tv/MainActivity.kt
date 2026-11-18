@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
+                textZoom = 100
                 useWideViewPort = true
                 loadWithOverviewMode = true
                 allowFileAccess = true
