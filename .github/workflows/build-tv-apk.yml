@@ -1,0 +1,60 @@
+name: Build Tempest Weather Google TV APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Accept Android SDK Licenses
+        run: |
+          if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          fi
+
+      - name: Build TV Release APK
+        working-directory: android-tv-app
+        run: gradle assembleRelease --no-daemon
+
+      - name: Prepare APK Artifact
+        run: cp android-tv-app/app/build/outputs/apk/release/app-release.apk tempest-weather-tv.apk
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tempest-weather-tv-apk
+          path: tempest-weather-tv.apk
+
+      - name: Publish to GitHub Release (for direct Downloader URL)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="latest-tv"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" tempest-weather-tv.apk --clobber
+          else
+            gh release create "$TAG" tempest-weather-tv.apk \
+              --title "Tempest Weather Google TV APK" \
+              --notes "Auto-built Google TV / Sony Bravia APK for Alta Ct (Station 218212)."
+          fi

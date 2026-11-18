@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 320x180 Google TV / Android TV Leanback App Tile Banner -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+
+    <!-- Dark obsidian tile surface -->
+    <path
+        android:fillColor="#16181D"
+        android:pathData="M0,0 L320,0 L320,180 L0,180 Z" />
+
+    <!-- Top spectrum bar segments -->
+    <path android:fillColor="#EF4444" android:pathData="M0,0 L53,0 L53,5 L0,5 Z" />
+    <path android:fillColor="#F59E0B" android:pathData="M53,0 L106,0 L106,5 L53,5 Z" />
+    <path android:fillColor="#22C55E" android:pathData="M106,0 L160,0 L160,5 L106,5 Z" />
+    <path android:fillColor="#06B6D4" android:pathData="M160,0 L214,0 L214,5 L160,5 Z" />
+    <path android:fillColor="#3B82F6" android:pathData="M214,0 L267,0 L267,5 L214,5 Z" />
+    <path android:fillColor="#A855F7" android:pathData="M267,0 L320,0 L320,5 L267,5 Z" />
+
+    <!-- Stylized Tempest weather waves emblem -->
+    <path
+        android:strokeColor="#F59E0B"
+        android:strokeWidth="10"
+        android:strokeLineCap="round"
+        android:pathData="M78,66 C94,48 118,48 134,66 C150,84 174,84 190,66 C206,48 228,48 242,60" />
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="10"
+        android:strokeLineCap="round"
+        android:pathData="M72,96 C90,78 114,78 132,96 C150,114 176,114 194,96 C210,80 230,78 248,88" />
+    <path
+        android:strokeColor="#60A5FA"
+        android:strokeWidth="8"
+        android:strokeLineCap="round"
+        android:pathData="M98,126 C114,112 134,112 150,126 C166,140 186,140 202,126" />
+</vector>

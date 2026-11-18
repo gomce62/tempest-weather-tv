@@ -1,0 +1,10 @@
+{
+  "name": "tempest-weather-dashboard",
+  "version": "1.0.0",
+  "description": "Dark-mode real-time weather station dashboard for WeatherFlow Tempest stations",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs"
+  }
+}

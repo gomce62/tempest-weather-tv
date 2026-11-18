@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tempest Weather Dashboard — Station 218212</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="spectrum-bar" aria-hidden="true"></div>
+
+  <!-- Top Header Bar -->
+  <header class="top-bar">
+    <div class="header-left">
+      <div class="brand-lockup" title="Tempest Weather Station Dashboard">
+        <svg class="brand-mark" width="38" height="30" viewBox="0 0 44 34" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="tempestGrad" x1="2" y1="4" x2="42" y2="30" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#f97316"/>
+              <stop offset="50%" stop-color="#f59e0b"/>
+              <stop offset="100%" stop-color="#38bdf8"/>
+            </linearGradient>
+          </defs>
+          <path d="M5 10C9 5 15 5 19 10C23 15 29 15 33 10C35 7.5 38 6.5 40 7" stroke="url(#tempestGrad)" stroke-width="3.6" stroke-linecap="round"/>
+          <path d="M4 19C8.5 14 14.5 14 19 19C23.5 24 29.5 24 34 19C36 16.8 38.5 16 40.5 16.5" stroke="url(#tempestGrad)" stroke-width="3.6" stroke-linecap="round"/>
+          <path d="M9 27.5C12.5 24 17 24 20.5 27.5C24 31 28.5 31 32 27.5" stroke="#38bdf8" stroke-width="3.2" stroke-linecap="round" opacity="0.85"/>
+        </svg>
+        <div class="brand-text">
+          <span>TEMPEST</span>
+          <span>WEATHER</span>
+        </div>
+      </div>
+
+      <div class="station-info">
+        <div class="station-title-row">
+          <h1 id="station-name" class="station-name">Tempest Station 218212</h1>
+          <button id="station-badge" class="station-badge" type="button" title="Click to configure Tempest API token & station">
+            DEMO PREVIEW
+          </button>
+        </div>
+        <div class="station-meta-row">
+          <span id="station-coords">Elev 1,857 ft, 41.123 °N 75.431 °W</span>
+          <span class="status-pill">
+            <span id="status-dot" class="status-dot connected"></span>
+            <span id="status-label" class="status-label">CONNECTED</span>
+          </span>
+          <span id="last-updated" class="last-updated">15 seconds ago</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="header-controls">
+        <button id="btn-units" class="icon-btn" type="button" title="Toggle Imperial (°F) / Metric (°C)">°F</button>
+        <button id="btn-refresh" class="icon-btn" type="button" title="Refresh data now" aria-label="Refresh">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+        </button>
+        <button id="btn-settings" class="icon-btn" type="button" title="API Key & Station Settings" aria-label="Settings">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="clock-block">
+        <div class="clock-time-row">
+          <span id="clock-time" class="clock-time">9:01</span>
+          <span id="clock-ampm" class="clock-ampm">PM</span>
+        </div>
+        <div id="clock-date" class="clock-date">Tuesday, November 17</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Optional subtle error/notice banner -->
+  <div id="notice-banner" class="notice-banner hidden" role="status">
+    <span id="notice-text"></span>
+    <button id="notice-action" class="notice-action" type="button">Configure API Key</button>
+  </div>
+
+  <!-- Main Dashboard Content -->
+  <main class="dashboard-main">
+    <!-- Top Section: Hero Current Conditions + 6 Metric Cards -->
+    <section class="upper-grid">
+      <!-- Left Hero Column -->
+      <div class="hero-panel">
+        <div class="temp-hero">
+          <span id="temp-whole" class="temp-whole">63</span>
+          <div class="temp-side-stack">
+            <span id="temp-unit" class="temp-unit">°F</span>
+            <span id="temp-decimal" class="temp-decimal">.1</span>
+          </div>
+        </div>
+
+        <div class="feels-like">
+          Feels Like <strong id="feels-like-val">63°</strong>
+        </div>
+
+        <div class="condition-block">
+          <div id="hero-icon" class="hero-icon"></div>
+          <div class="condition-copy">
+            <div id="condition-title" class="condition-title">Partly Cloudy</div>
+            <p id="condition-summary" class="condition-summary">
+              Partly cloudy skies. Low 48°F. Winds SW at 5 to 10 mph.
+            </p>
+          </div>
+        </div>
+
+        <div class="temp-range-widget">
+          <div class="temp-range-labels">
+            <span>LOW <strong id="today-low-val">48°</strong></span>
+            <span>HIGH <strong id="today-high-val">69°</strong></span>
+          </div>
+          <div class="temp-range-track">
+            <div id="temp-range-dot" class="temp-range-dot" style="left: 72%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right 3x2 Metric Cards Grid -->
+      <div class="metrics-grid">
+        <!-- 1. Humidity -->
+        <article class="metric-card">
+          <div class="card-label">HUMIDITY</div>
+          <div class="card-body-row">
+            <div class="card-primary-stack">
+              <div class="card-value-line">
+                <span id="humidity-val" class="card-value">51</span>
+                <span class="card-unit">%</span>
+              </div>
+            </div>
+            <div id="gauge-humidity" class="card-gauge"></div>
+          </div>
+          <div class="card-footer-row">
+            <div class="card-sub-group">
+              <span class="sub-label">DEW POINT</span>
+              <span id="dewpoint-val" class="sub-value">44.8°</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- 2. Wind -->
+        <article class="metric-card">
+          <div class="card-label">WIND</div>
+          <div class="card-body-row">
+            <div class="card-primary-stack">
+              <div class="card-value-line">
+                <span id="wind-val" class="card-value">1.1</span>
+                <span id="wind-unit" class="card-unit">mph</span>
+              </div>
+              <div id="wind-dir-text" class="card-inline-meta">WNW &middot; 289°</div>
+            </div>
+            <div id="gauge-wind" class="card-gauge"></div>
+          </div>
+          <div class="card-footer-row">
+            <div class="card-sub-group">
+              <span class="sub-label">GUSTS</span>
+              <span class="sub-value"><span id="wind-gust-val">3.4</span> <span class="sub-unit wind-unit-text">mph</span></span>
+            </div>
+            <div class="card-sub-group">
+              <span class="sub-label">PEAK TODAY</span>
+              <span class="sub-value"><span id="wind-peak-val">7.4</span> <span class="sub-unit wind-unit-text">mph</span></span>
+            </div>
+          </div>
+        </article>
+
+        <!-- 3. Pressure -->
+        <article class="metric-card">
+          <div class="card-label">PRESSURE</div>
+          <div class="card-body-row">
+            <div class="card-primary-stack">
+              <div class="card-value-line">
+                <span id="pressure-val" class="card-value">30.21</span>
+                <span id="pressure-unit" class="card-unit">in</span>
+              </div>
+            </div>
+            <div id="gauge-pressure" class="card-gauge"></div>
+          </div>
+          <div class="card-footer-row">
+            <div class="card-sub-group">
+              <span class="sub-label">TREND</span>
+              <span id="pressure-trend-val" class="sub-value trend-text">&#9662; Falling</span>
+            </div>
+            <div class="card-sub-group">
+              <span class="sub-label">3-HR CHANGE</span>
+              <span id="pressure-delta-val" class="sub-value">&minus;0.01 <span class="sub-unit press-unit-text">in</span></span>
+            </div>
+          </div>
+        </article>
+
+        <!-- 4. Precipitation -->
+        <article class="metric-card">
+          <div class="card-label">PRECIPITATION</div>
+          <div class="card-body-row">
+            <div class="card-primary-stack">
+              <div class="card-value-line">
+                <span id="precip-val" class="card-value">0</span>
+                <span id="precip-unit" class="card-unit">in</span>
+              </div>
+              <div class="card-inline-meta">Today</div>
+            </div>
+            <div id="gauge-precip" class="card-gauge"></div>
+          </div>
+          <div class="card-footer-row">
+            <div class="card-sub-group">
+              <span class="sub-label">RATE</span>
+              <span class="sub-value"><span id="precip-rate-val">0</span> <span class="sub-unit precip-rate-unit">in/hr</span></span>
+            </div>
+            <div class="card-sub-group">
+              <span class="sub-label">7-DAY</span>
+              <span class="sub-value"><span id="precip-7day-val">0</span> <span class="sub-unit precip-unit-text">in</span></span>
+            </div>
+          </div>
+        </article>
+
+        <!-- 5. UV Index -->
+        <article class="metric-card">
+          <div class="card-label">UV INDEX</div>
+          <div class="card-body-row">
+            <div class="card-primary-stack">
+              <div class="card-value-line">
+                <span id="uv-val" class="card-value">0</span>
+              </div>
+              <div id="uv-level" class="card-inline-meta uv-low">Low</div>
+            </div>
+            <div id="gauge-uv" class="card-gauge"></div>
+          </div>
+          <div class="card-footer-row">
+            <div class="card-sub-group">
+              <span class="sub-label">PROTECTION</span>
+              <span id="uv-protection" class="sub-value">None needed</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- 6. Solar Radiation -->
+        <article class="metric-card">
+          <div class="card-label">SOLAR RADIATION</div>
+          <div class="card-body-row">
+            <div class="card-primary-stack">
+              <div class="card-value-line">
+                <span id="solar-val" class="card-value">13.4</span>
+                <span class="card-unit">W/m²</span>
+              </div>
+            </div>
+            <div id="gauge-solar" class="card-gauge"></div>
+          </div>
+          <div class="card-footer-row">
+            <div class="card-sub-group">
+              <span class="sub-label">PEAK TODAY</span>
+              <span class="sub-value"><span id="solar-peak-val">293</span> <span class="sub-unit">W/m²</span></span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Forecast Strip -->
+    <section class="forecast-section">
+      <div id="forecast-heading" class="section-heading">15-DAY FORECAST</div>
+      <div id="forecast-strip" class="forecast-strip"></div>
+    </section>
+
+    <!-- Bottom Astronomy & Fullscreen Footer -->
+    <footer class="footer-bar">
+      <div class="astro-group">
+        <div class="astro-item">
+          <span id="icon-sunrise" class="astro-icon"></span>
+          <span class="astro-label">Sunrise</span>
+          <strong id="sunrise-val" class="astro-value">6:35 AM</strong>
+        </div>
+        <div class="astro-item">
+          <span id="icon-sunset" class="astro-icon"></span>
+          <span class="astro-label">Sunset</span>
+          <strong id="sunset-val" class="astro-value">4:54 PM</strong>
+        </div>
+        <div class="astro-item">
+          <span id="icon-moon" class="astro-icon"></span>
+          <span class="astro-label">Moon</span>
+          <strong id="moon-val" class="astro-value">Waning Crescent</strong>
+        </div>
+        <div id="lightning-item" class="astro-item lightning-item hidden">
+          <span class="astro-icon">&#9889;</span>
+          <span class="astro-label">Lightning</span>
+          <strong id="lightning-val" class="astro-value"></strong>
+        </div>
+      </div>
+
+      <button id="btn-fullscreen" class="fullscreen-btn" type="button" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <polyline points="9 21 3 21 3 15"></polyline>
+          <line x1="21" y1="3" x2="14" y2="10"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+      </button>
+    </footer>
+  </main>
+
+  <!-- Day Detail Forecast Modal -->
+  <div id="day-detail-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="detail-day-title">
+    <div class="day-detail-card">
+      <div class="detail-top-bar">
+        <div class="detail-title-col">
+          <h2 id="detail-day-title" class="detail-day-title">Wed 18</h2>
+          <div id="detail-day-cond" class="detail-day-cond">Thunderstorms Likely</div>
+        </div>
+        <div id="detail-day-icon" class="detail-day-icon"></div>
+        <div class="detail-summary-stats">
+          <span class="detail-stat detail-pop">
+            <svg width="11" height="14" viewBox="0 0 10 12" fill="none" aria-hidden="true">
+              <path d="M5 0.8C5 0.8 1 5.4 1 7.9C1 10.1 2.8 11.6 5 11.6C7.2 11.6 9 10.1 9 7.9C9 5.4 5 0.8 5 0.8Z" fill="#e5e7eb"/>
+            </svg>
+            <span id="detail-pop-val">80%</span>
+          </span>
+          <span class="detail-stat"><span class="detail-arrow">&darr;</span> <span id="detail-low-val">51°</span></span>
+          <span class="detail-stat"><span class="detail-arrow">&uarr;</span> <span id="detail-high-val">62°</span></span>
+        </div>
+        <div class="detail-nav-actions">
+          <button id="detail-prev" class="detail-nav-btn" type="button" title="Previous day" aria-label="Previous day">&lsaquo;</button>
+          <button id="detail-next" class="detail-nav-btn" type="button" title="Next day" aria-label="Next day">&rsaquo;</button>
+          <button id="detail-close" class="detail-nav-btn" type="button" title="Close" aria-label="Close">&times;</button>
+        </div>
+      </div>
+
+      <div class="detail-sun-row">
+        <div class="detail-sun-item">
+          <svg width="28" height="22" viewBox="0 0 32 24" fill="none" stroke="#d5dae0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 19a7 7 0 0 1 14 0" />
+            <line x1="16" y1="3" x2="16" y2="7" />
+            <line x1="6.8" y1="7.8" x2="9.6" y2="10.6" />
+            <line x1="25.2" y1="7.8" x2="22.4" y2="10.6" />
+            <line x1="3" y1="15" x2="6.5" y2="15" />
+            <line x1="25.5" y1="15" x2="29" y2="15" />
+            <line x1="16" y1="22" x2="16" y2="14.5" />
+            <polyline points="13.2 17.2 16 14.4 18.8 17.2" />
+          </svg>
+          <span id="detail-sunrise-val">6:41 am</span>
+        </div>
+        <div class="detail-sun-item">
+          <svg width="28" height="22" viewBox="0 0 32 24" fill="none" stroke="#d5dae0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 19a7 7 0 0 1 14 0" />
+            <line x1="16" y1="3" x2="16" y2="7" />
+            <line x1="6.8" y1="7.8" x2="9.6" y2="10.6" />
+            <line x1="25.2" y1="7.8" x2="22.4" y2="10.6" />
+            <line x1="3" y1="15" x2="6.5" y2="15" />
+            <line x1="25.5" y1="15" x2="29" y2="15" />
+            <line x1="16" y1="14.5" x2="16" y2="22" />
+            <polyline points="13.2 19.2 16 22 18.8 19.2" />
+          </svg>
+          <span id="detail-sunset-val">4:54 pm</span>
+        </div>
+      </div>
+
+      <div id="detail-hourly-scroll" class="detail-hourly-scroll">
+        <div id="detail-hourly-strip" class="detail-hourly-strip"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings / API Key Modal -->
+  <div id="settings-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="modal-title">Tempest Station Configuration</h2>
+        <button id="modal-close" class="modal-close" type="button" aria-label="Close">&times;</button>
+      </div>
+
+      <form id="settings-form" class="modal-body">
+        <div class="form-group">
+          <label for="input-station-id">Tempest Station ID</label>
+          <input id="input-station-id" type="text" value="218212" placeholder="e.g. 218212" required />
+          <span class="form-hint">Found in your station URL: <code>tempestwx.com/station/<strong>218212</strong>/grid</code></span>
+        </div>
+
+        <div class="form-group">
+          <label for="input-api-token">Tempest Personal Access Token (API Key)</label>
+          <input id="input-api-token" type="password" placeholder="Paste your Tempest Personal Access Token" autocomplete="off" />
+          <span class="form-hint">
+            Create one at <a href="https://tempestwx.com/settings/tokens" target="_blank" rel="noopener noreferrer">tempestwx.com/settings/tokens</a>
+            (Settings &rarr; Data Authorizations &rarr; Create Token).
+          </span>
+        </div>
+
+        <div class="form-row-inline">
+          <div class="form-group">
+            <label for="input-units">Display Units</label>
+            <select id="input-units">
+              <option value="imperial">Imperial (°F, mph, inHg)</option>
+              <option value="metric">Metric (°C, km/h, hPa)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="input-mode">Data Source</label>
+            <select id="input-mode">
+              <option value="live">Live Tempest Station</option>
+              <option value="demo">Showcase Demo Mode</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="checkbox-row" id="save-server-row">
+          <input id="input-save-server" type="checkbox" checked />
+          <span>Save token &amp; station ID to local server <code>.env</code> file</span>
+        </label>
+
+        <div id="modal-error" class="modal-error hidden"></div>
+
+        <div class="modal-actions">
+          <button id="btn-use-demo" type="button" class="btn-secondary">Preview Demo Mode</button>
+          <button type="submit" class="btn-primary">Connect &amp; Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
