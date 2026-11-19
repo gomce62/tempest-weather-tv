@@ -1,4 +1,4 @@
-﻿<#
+<#
   Tempest Weather Dashboard — Zero-Dependency Windows PowerShell Server
   Serves ./public static files and proxies WeatherFlow Tempest REST API requests (eliminating CORS).
   Compatible with Windows PowerShell 5.1 and PowerShell 7+.
@@ -61,6 +61,72 @@ if ($Port -le 0) {
 
 # In-memory cache for 6-day prior precipitation (refreshed every 30 minutes)
 $SevenDayCache = @{}
+$TideCache = @{}
+$NoaaTidesBase = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter'
+$MorroBayNoaaStation = '9412110'
+
+function Format-TideTime12 {
+    param([string]$TimeStr)
+    $parts = ($TimeStr -split '\s+')
+    if ($parts.Count -lt 2) { return $TimeStr }
+    $hm = $parts[1] -split ':'
+    $h24 = 0
+    if (-not [int]::TryParse($hm[0], [ref]$h24)) { return $parts[1] }
+    $min = if ($hm.Count -gt 1) { $hm[1] } else { '00' }
+    $ampm = if ($h24 -ge 12) { 'PM' } else { 'AM' }
+    $h12 = $h24 % 12
+    if ($h12 -eq 0) { $h12 = 12 }
+    return "${h12}:${min} ${ampm}"
+}
+
+function Get-MorroBayTides {
+    param([string]$Units = 'imperial')
+    $isMetric = ($Units -eq 'metric')
+    $ymd = (Get-Date).ToString('yyyyMMdd')
+    try {
+        $pst = [System.TimeZoneInfo]::FindSystemTimeZoneById('Pacific Standard Time')
+        $pacNow = [System.TimeZoneInfo]::ConvertTimeFromUtc([DateTime]::UtcNow, $pst)
+        $ymd = $pacNow.ToString('yyyyMMdd')
+    } catch {}
+
+    $cacheKey = "${ymd}_$(if ($isMetric) { 'm' } else { 'e' })"
+    $nowUtc = [DateTime]::UtcNow
+    if ($TideCache.ContainsKey($cacheKey) -and ($nowUtc - $TideCache[$cacheKey].Time).TotalMinutes -lt 60) {
+        return $TideCache[$cacheKey].Data
+    }
+
+    try {
+        $uParam = if ($isMetric) { 'metric' } else { 'english' }
+        $url = "$NoaaTidesBase`?begin_date=$ymd&end_date=$ymd&station=$MorroBayNoaaStation&product=predictions&datum=MLLW&time_zone=lst_ldt&interval=hilo&units=$uParam&application=tempest_weather_tv&format=json"
+        $data = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 10 -ErrorAction Stop
+        if ($data -and $data.predictions -and $data.predictions.Count -gt 0) {
+            $unitLabel = if ($isMetric) { 'm' } else { 'ft' }
+            $preds = @()
+            foreach ($p in $data.predictions) {
+                $val = 0.0
+                [void][double]::TryParse([string]$p.v, [ref]$val)
+                $tType = if (([string]$p.type).ToUpper() -eq 'L') { 'L' } else { 'H' }
+                $preds += @{
+                    time = [string]$p.t
+                    time12 = Format-TideTime12 ([string]$p.t)
+                    type = $tType
+                    label = if ($tType -eq 'H') { 'High' } else { 'Low' }
+                    height = [Math]::Round($val, 1)
+                    unit = $unitLabel
+                }
+            }
+            $out = @{
+                stationId = $MorroBayNoaaStation
+                stationName = 'Morro Bay'
+                unit = $unitLabel
+                predictions = $preds
+            }
+            $TideCache[$cacheKey] = @{ Time = $nowUtc; Data = $out }
+            return $out
+        }
+    } catch {}
+    return $null
+}
 
 function Degrees-ToCardinal {
     param([double]$Deg)
@@ -385,6 +451,7 @@ function Get-TempestDashboardPayload {
             sunriseEpoch = if ($todayFc) { $todayFc.sunrise } else { $null }
             sunsetEpoch = if ($todayFc) { $todayFc.sunset } else { $null }
         }
+        tides = Get-MorroBayTides -Units $Units
         daily = $dailyOut
         hourly = $hourlyOut
     }

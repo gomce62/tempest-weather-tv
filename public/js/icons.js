@@ -264,3 +264,12 @@ export function getSunsetSvg() {
     </svg>
   `;
 }
+
+export function getTideWaveSvg() {
+  return `
+    <svg width="20" height="16" viewBox="0 0 22 18" fill="none" aria-hidden="true">
+      <path d="M2 7.5C4.2 5 6.8 5 9 7.5C11.2 10 13.8 10 16 7.5C17.5 5.8 19 5.3 20.5 6" stroke="#38bdf8" stroke-width="1.7" stroke-linecap="round"/>
+      <path d="M2 12.5C4.2 10 6.8 10 9 12.5C11.2 15 13.8 15 16 12.5C17.5 10.8 19 10.3 20.5 11" stroke="#0ea5e9" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/>
+    </svg>
+  `;
+}

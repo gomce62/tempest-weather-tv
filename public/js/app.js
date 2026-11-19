@@ -7,12 +7,13 @@ import {
   renderUvPyramid,
   renderSolarOrb,
 } from './gauges.js';
-import { getWeatherIconSvg, getRaindropSvg, getSunriseSvg, getSunsetSvg } from './icons.js';
+import { getWeatherIconSvg, getRaindropSvg, getSunriseSvg, getSunsetSvg, getTideWaveSvg } from './icons.js';
 import { getMoonPhase, renderMoonSvg } from './moon.js';
 import {
   fetchServerConfig,
   saveServerConfig,
   fetchTempestDashboard,
+  fetchMorroBayTides,
   TempestWebSocket,
   degreesToCardinal,
 } from './tempest-client.js';
@@ -105,6 +106,9 @@ const els = {
   sunriseVal: document.getElementById('sunrise-val'),
   sunsetVal: document.getElementById('sunset-val'),
   moonVal: document.getElementById('moon-val'),
+  tidesItem: document.getElementById('tides-item'),
+  iconTides: document.getElementById('icon-tides'),
+  tidesVal: document.getElementById('tides-val'),
   lightningItem: document.getElementById('lightning-item'),
   lightningVal: document.getElementById('lightning-val'),
 
@@ -478,6 +482,9 @@ function renderDashboard(data) {
   els.iconMoon.innerHTML = renderMoonSvg(moon.cycle, 18);
   els.moonVal.textContent = moon.name;
 
+  // Morro Bay Tides
+  renderTides(data.tides, data.units);
+
   // Lightning alert (Tempest specialty!)
   if (!data.isDemo && cur.lightningCount1hr > 0) {
     const distUnit = isMetric ? 'km' : 'mi';
@@ -487,6 +494,34 @@ function renderDashboard(data) {
   } else {
     els.lightningItem.classList.add('hidden');
   }
+}
+
+function renderTides(tides, units) {
+  if (!els.iconTides || !els.tidesVal) return;
+  els.iconTides.innerHTML = getTideWaveSvg();
+  const preds = Array.isArray(tides?.predictions) ? tides.predictions : [];
+  if (preds.length > 0) {
+    const unitLabel = tides?.unit || (units === 'metric' ? 'm' : 'ft');
+    els.tidesVal.innerHTML = `<span class="tides-list">${preds
+      .map((p) => {
+        const isHigh = String(p.type || '').toUpperCase() !== 'L';
+        const arrow = isHigh ? '&#9652;' : '&#9662;';
+        const typeLbl = isHigh ? 'H' : 'L';
+        const hVal = typeof p.height === 'number' ? p.height.toFixed(1) : p.height;
+        return `<span class="tide-entry"><span class="tide-type ${isHigh ? 'is-high' : 'is-low'}">${arrow}${typeLbl}</span> <span>${p.time12}</span> <span class="tide-height">(${hVal} ${p.unit || unitLabel})</span></span>`;
+      })
+      .join('')}</span>`;
+    return;
+  }
+  // Client-side fallback fetch from NOAA if server/proxy didn't include tides yet
+  fetchMorroBayTides(units).then((fetched) => {
+    if (fetched && Array.isArray(fetched.predictions) && fetched.predictions.length > 0) {
+      if (state.data) state.data.tides = fetched;
+      renderTides(fetched, units);
+    } else if (els.tidesVal.textContent === 'Loading...') {
+      els.tidesVal.textContent = 'Unavailable';
+    }
+  });
 }
 
 function renderForecast(daily = [], timezone) {

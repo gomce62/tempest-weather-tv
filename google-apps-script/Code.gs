@@ -22,6 +22,75 @@
  */
 
 const TEMPEST_BASE = 'https://swd.weatherflow.com/swd/rest';
+const NOAA_TIDES_BASE = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
+const MORRO_BAY_NOAA_STATION = '9412110'; // Port San Luis / Morro Bay official NOAA station
+
+function formatTideTime12_(timeStr) {
+  // NOAA timeStr format: "YYYY-MM-DD HH:mm" in station local time (lst_ldt)
+  const parts = String(timeStr || '').trim().split(/\s+/);
+  if (parts.length < 2) return timeStr || '';
+  const hm = parts[1].split(':');
+  const h24 = parseInt(hm[0], 10);
+  const min = hm[1] || '00';
+  if (isNaN(h24)) return parts[1];
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 || 12;
+  return h12 + ':' + min + ' ' + ampm;
+}
+
+function fetchMorroBayTides_(units) {
+  const m = units === 'metric';
+  const cache = CacheService.getScriptCache();
+  const now = new Date();
+  const ymd = Utilities.formatDate(now, 'America/Los_Angeles', 'yyyyMMdd');
+  const cacheKey = 'tides_mb_' + ymd + '_' + (m ? 'm' : 'e');
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) {}
+  }
+
+  try {
+    const url = NOAA_TIDES_BASE +
+      '?begin_date=' + ymd +
+      '&end_date=' + ymd +
+      '&station=' + MORRO_BAY_NOAA_STATION +
+      '&product=predictions' +
+      '&datum=MLLW' +
+      '&time_zone=lst_ldt' +
+      '&interval=hilo' +
+      '&units=' + (m ? 'metric' : 'english') +
+      '&application=tempest_weather_tv' +
+      '&format=json';
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (res.getResponseCode() >= 200 && res.getResponseCode() < 300) {
+      const data = JSON.parse(res.getContentText());
+      if (data && Array.isArray(data.predictions) && data.predictions.length > 0) {
+        const unitLabel = m ? 'm' : 'ft';
+        const predictions = data.predictions.map(function (p) {
+          const val = parseFloat(p.v);
+          const type = String(p.type || '').toUpperCase() === 'L' ? 'L' : 'H';
+          return {
+            time: p.t,
+            time12: formatTideTime12_(p.t),
+            type: type,
+            label: type === 'H' ? 'High' : 'Low',
+            height: isNaN(val) ? 0 : Number(val.toFixed(1)),
+            unit: unitLabel,
+          };
+        });
+        const out = {
+          stationId: MORRO_BAY_NOAA_STATION,
+          stationName: 'Morro Bay',
+          unit: unitLabel,
+          predictions: predictions,
+        };
+        try { cache.put(cacheKey, JSON.stringify(out), 3600); } catch (e) {}
+        return out;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
 
 function getSecretToken_() {
   const props = PropertiesService.getScriptProperties();
@@ -279,6 +348,7 @@ function fetchTempestDashboard_(stationId, token, units) {
       sunriseEpoch: todayFc.sunrise || null,
       sunsetEpoch: todayFc.sunset || null,
     },
+    tides: fetchMorroBayTides_(units),
     daily: dailyRaw.map(function (d) {
       return {
         dayStartEpoch: d.day_start_local,

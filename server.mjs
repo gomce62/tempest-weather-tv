@@ -12,6 +12,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const ENV_PATH = path.join(__dirname, '.env');
 const TEMPEST_BASE = 'https://swd.weatherflow.com/swd/rest';
+const NOAA_TIDES_BASE = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
+const MORRO_BAY_NOAA_STATION = '9412110'; // Port San Luis / Morro Bay official NOAA station
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -26,6 +28,84 @@ const MIME_TYPES = {
 };
 
 const sevenDayCache = new Map();
+const tideCache = new Map();
+
+function formatTideTime12(timeStr) {
+  const parts = String(timeStr || '').trim().split(/\s+/);
+  if (parts.length < 2) return timeStr || '';
+  const [hStr, mStr = '00'] = parts[1].split(':');
+  const h24 = parseInt(hStr, 10);
+  if (Number.isNaN(h24)) return parts[1];
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 || 12;
+  return `${h12}:${mStr} ${ampm}`;
+}
+
+async function fetchMorroBayTides(units = 'imperial') {
+  const isMetric = units === 'metric';
+  let ymd;
+  try {
+    ymd = new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: 'America/Los_Angeles',
+    })
+      .format(new Date())
+      .replace(/-/g, '');
+  } catch {
+    const d = new Date();
+    ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  const cacheKey = `${ymd}_${isMetric ? 'm' : 'e'}`;
+  const cached = tideCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < 60 * 60 * 1000) {
+    return cached.data;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      begin_date: ymd,
+      end_date: ymd,
+      station: MORRO_BAY_NOAA_STATION,
+      product: 'predictions',
+      datum: 'MLLW',
+      time_zone: 'lst_ldt',
+      interval: 'hilo',
+      units: isMetric ? 'metric' : 'english',
+      application: 'tempest_weather_tv',
+      format: 'json',
+    });
+    const data = await fetchJson(`${NOAA_TIDES_BASE}?${params.toString()}`);
+    if (Array.isArray(data?.predictions) && data.predictions.length > 0) {
+      const unitLabel = isMetric ? 'm' : 'ft';
+      const predictions = data.predictions.map((p) => {
+        const val = parseFloat(p.v);
+        const type = String(p.type || '').toUpperCase() === 'L' ? 'L' : 'H';
+        return {
+          time: p.t,
+          time12: formatTideTime12(p.t),
+          type,
+          label: type === 'H' ? 'High' : 'Low',
+          height: Number.isNaN(val) ? 0 : Number(val.toFixed(1)),
+          unit: unitLabel,
+        };
+      });
+      const out = {
+        stationId: MORRO_BAY_NOAA_STATION,
+        stationName: 'Morro Bay',
+        unit: unitLabel,
+        predictions,
+      };
+      tideCache.set(cacheKey, { ts: Date.now(), data: out });
+      return out;
+    }
+  } catch {
+    // Non-fatal if NOAA CO-OPS is unreachable
+  }
+  return null;
+}
 
 async function loadDotEnv() {
   const map = {};
@@ -124,13 +204,14 @@ async function buildDashboardPayload({ stationId, token, units }) {
     token,
   });
 
-  const [stationJson, forecastJson, obsJson] = await Promise.all([
+  const [stationJson, forecastJson, obsJson, tides] = await Promise.all([
     fetchJson(`${TEMPEST_BASE}/stations/${encodeURIComponent(stationId)}?token=${encodeURIComponent(token)}`).catch((e) => {
       if (e.status === 401 || e.status === 403) throw e;
       return null;
     }),
     fetchJson(`${TEMPEST_BASE}/better_forecast?${params.toString()}`),
     fetchJson(`${TEMPEST_BASE}/observations/station/${encodeURIComponent(stationId)}?token=${encodeURIComponent(token)}`).catch(() => null),
+    fetchMorroBayTides(units),
   ]);
 
   const stationObj = stationJson?.stations?.[0] || {};
@@ -280,6 +361,7 @@ async function buildDashboardPayload({ stationId, token, units }) {
       sunriseEpoch: todayFc.sunrise || null,
       sunsetEpoch: todayFc.sunset || null,
     },
+    tides,
     daily: dailyRaw.map((d) => ({
       dayStartEpoch: d.day_start_local,
       conditions: d.conditions || '',

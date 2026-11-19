@@ -9,6 +9,90 @@
 
 const TEMPEST_REST_BASE = 'https://swd.weatherflow.com/swd/rest';
 const TEMPEST_WS_BASE = 'wss://ws.weatherflow.com/swd/data';
+const NOAA_TIDES_BASE = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
+const MORRO_BAY_NOAA_STATION = '9412110';
+
+const browserTideCache = new Map();
+
+function formatTideTime12(timeStr) {
+  const parts = String(timeStr || '').trim().split(/\s+/);
+  if (parts.length < 2) return timeStr || '';
+  const [hStr, mStr = '00'] = parts[1].split(':');
+  const h24 = parseInt(hStr, 10);
+  if (Number.isNaN(h24)) return parts[1];
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 || 12;
+  return `${h12}:${mStr} ${ampm}`;
+}
+
+export async function fetchMorroBayTides(units = 'imperial') {
+  const isMetric = units === 'metric';
+  let ymd;
+  try {
+    ymd = new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: 'America/Los_Angeles',
+    })
+      .format(new Date())
+      .replace(/-/g, '');
+  } catch {
+    const d = new Date();
+    ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  const cacheKey = `${ymd}_${isMetric ? 'm' : 'e'}`;
+  const cached = browserTideCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < 60 * 60 * 1000) {
+    return cached.data;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      begin_date: ymd,
+      end_date: ymd,
+      station: MORRO_BAY_NOAA_STATION,
+      product: 'predictions',
+      datum: 'MLLW',
+      time_zone: 'lst_ldt',
+      interval: 'hilo',
+      units: isMetric ? 'metric' : 'english',
+      application: 'tempest_weather_tv',
+      format: 'json',
+    });
+    const res = await fetch(`${NOAA_TIDES_BASE}?${params.toString()}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.predictions) && data.predictions.length > 0) {
+        const unitLabel = isMetric ? 'm' : 'ft';
+        const predictions = data.predictions.map((p) => {
+          const val = parseFloat(p.v);
+          const type = String(p.type || '').toUpperCase() === 'L' ? 'L' : 'H';
+          return {
+            time: p.t,
+            time12: formatTideTime12(p.t),
+            type,
+            label: type === 'H' ? 'High' : 'Low',
+            height: Number.isNaN(val) ? 0 : Number(val.toFixed(1)),
+            unit: unitLabel,
+          };
+        });
+        const out = {
+          stationId: MORRO_BAY_NOAA_STATION,
+          stationName: 'Morro Bay',
+          unit: unitLabel,
+          predictions,
+        };
+        browserTideCache.set(cacheKey, { ts: Date.now(), data: out });
+        return out;
+      }
+    }
+  } catch {
+    // Non-fatal fallback
+  }
+  return null;
+}
 
 export function degreesToCardinal(deg) {
   if (deg === null || deg === undefined || Number.isNaN(Number(deg))) return '--';
@@ -145,10 +229,11 @@ async function fetchDirectFromWeatherFlow({ stationId, token, units }) {
     token,
   });
 
-  const [stationRes, forecastRes, obsRes] = await Promise.all([
+  const [stationRes, forecastRes, obsRes, tides] = await Promise.all([
     fetch(`${TEMPEST_REST_BASE}/stations/${encodeURIComponent(stationId)}?token=${encodeURIComponent(token)}`),
     fetch(`${TEMPEST_REST_BASE}/better_forecast?${bfParams.toString()}`),
     fetch(`${TEMPEST_REST_BASE}/observations/station/${encodeURIComponent(stationId)}?token=${encodeURIComponent(token)}`),
+    fetchMorroBayTides(units),
   ]);
 
   if (stationRes.status === 401 || forecastRes.status === 401) {
@@ -162,10 +247,10 @@ async function fetchDirectFromWeatherFlow({ stationId, token, units }) {
   const forecastJson = await forecastRes.json();
   const obsJson = obsRes.ok ? await obsRes.json() : {};
 
-  return normalizeTempestResponses({ stationJson, forecastJson, obsJson, stationId, units });
+  return normalizeTempestResponses({ stationJson, forecastJson, obsJson, tides, stationId, units });
 }
 
-export function normalizeTempestResponses({ stationJson, forecastJson, obsJson, historyStats, stationId, units }) {
+export function normalizeTempestResponses({ stationJson, forecastJson, obsJson, historyStats, tides = null, stationId, units }) {
   const isMetric = units === 'metric';
   const stationObj = stationJson?.stations?.[0] || {};
   const devices = stationObj.devices || [];
@@ -285,6 +370,7 @@ export function normalizeTempestResponses({ stationJson, forecastJson, obsJson, 
       sunriseEpoch: todayForecast.sunrise || null,
       sunsetEpoch: todayForecast.sunset || null,
     },
+    tides,
     daily,
     hourly: hourlyRaw.map((h) => ({
       t: h.time,

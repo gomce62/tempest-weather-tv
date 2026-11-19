@@ -135,6 +135,17 @@ export function getDemoDashboardData(units = 'imperial') {
       sunriseEpoch: Math.floor(sunriseDate.getTime() / 1000),
       sunsetEpoch: Math.floor(sunsetDate.getTime() / 1000),
     },
+    tides: {
+      stationId: '9412110',
+      stationName: 'Morro Bay',
+      unit: isMetric ? 'm' : 'ft',
+      predictions: [
+        { time12: '5:36 AM', type: 'H', label: 'High', height: isMetric ? 1.4 : 4.5, unit: isMetric ? 'm' : 'ft' },
+        { time12: '11:35 AM', type: 'L', label: 'Low', height: isMetric ? 0.8 : 2.5, unit: isMetric ? 'm' : 'ft' },
+        { time12: '4:40 PM', type: 'H', label: 'High', height: isMetric ? 1.2 : 3.8, unit: isMetric ? 'm' : 'ft' },
+        { time12: '11:07 PM', type: 'L', label: 'Low', height: isMetric ? 0.3 : 1.0, unit: isMetric ? 'm' : 'ft' },
+      ],
+    },
     daily,
     hourly,
   };
