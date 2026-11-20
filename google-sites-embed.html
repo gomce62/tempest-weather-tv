@@ -139,12 +139,25 @@
       align-items: center;
       gap: 16px;
     }
+    .briefing-card.is-interactive { cursor: pointer; transition: border-color 0.16s ease, background 0.16s ease; }
+    .briefing-card.is-interactive:hover, .briefing-card.is-interactive:focus-visible {
+      border-color: #46668a;
+      background: linear-gradient(90deg, rgba(96, 174, 255, 0.15) 0%, rgba(30, 34, 41, 0.98) 45%);
+      outline: none;
+    }
     .briefing-badge {
       display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600;
       letter-spacing: 0.09em; color: #7cc4ec; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
     }
     .briefing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-blue); box-shadow: 0 0 8px rgba(88, 166, 255, 0.75); }
-    .briefing-text { font-size: 14px; line-height: 1.48; color: #e4e8ef; min-width: 0; }
+    .briefing-text { font-size: 14px; line-height: 1.48; color: #e4e8ef; min-width: 0; flex: 1; }
+    .briefing-play-btn {
+      flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px;
+      border-radius: 999px; border: 1px solid rgba(96, 174, 255, 0.4); background: rgba(96, 174, 255, 0.14);
+      color: #cde6ff; font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.03em; cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .briefing-play-btn:hover { background: rgba(96, 174, 255, 0.28); border-color: var(--accent-blue); color: #ffffff; }
 
     .upper-grid { display: grid; grid-template-columns: minmax(300px, 36.5%) 1fr; gap: 22px; align-items: stretch; }
     .hero-panel { display: flex; flex-direction: column; justify-content: center; padding: 6px 8px 4px 4px; }
@@ -323,6 +336,41 @@
     @media (max-width: 520px) {
       .metrics-grid { grid-template-columns: 1fr; }
     }
+    .avatar-modal-card { width: 100%; max-width: 760px; background: #171a20; border: 1px solid #323946; border-radius: 16px; box-shadow: 0 28px 80px rgba(0,0,0,0.78); overflow: hidden; padding: 22px; }
+    .avatar-modal-grid { display: grid; grid-template-columns: 280px 1fr; gap: 24px; align-items: stretch; }
+    .avatar-studio-col { display: flex; flex-direction: column; gap: 10px; }
+    .avatar-status-pill { display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; color: #b7c2d0; }
+    .avatar-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #64748b; }
+    .avatar-status-pill.is-live { background: rgba(239,68,68,0.16); border-color: rgba(239,68,68,0.45); color: #fecaca; }
+    .avatar-status-pill.is-live .avatar-status-dot { background: #ef4444; box-shadow: 0 0 10px rgba(239,68,68,0.9); animation: avatarPulse 1.1s ease-in-out infinite; }
+    @keyframes avatarPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(1.2); } }
+    .avatar-stage { width: 280px; height: 280px; border-radius: 14px; overflow: hidden; border: 1px solid #2e3847; box-shadow: 0 14px 36px rgba(0,0,0,0.5); background: #0f172a; }
+    .avatar-svg { width: 100%; height: 100%; display: block; }
+    .avatar-svg .av-head { transform-origin: 140px 175px; transition: transform 0.25s ease; }
+    .avatar-svg.is-speaking .av-head { animation: avHeadTalk 2.6s ease-in-out infinite; }
+    .avatar-svg.is-speaking .av-brows { animation: avBrowTalk 2.2s ease-in-out infinite; }
+    @keyframes avHeadTalk { 0%, 100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-1.5px) rotate(-1.2deg); } 55% { transform: translateY(0.8px) rotate(1.1deg); } 80% { transform: translateY(-1px) rotate(-0.5deg); } }
+    @keyframes avBrowTalk { 0%, 100% { transform: translateY(0); } 35% { transform: translateY(-1.4px); } 70% { transform: translateY(0.2px); } }
+    .avatar-svg .av-eyelids { transform-origin: 140px 115px; transform: scaleY(0); opacity: 0; transition: transform 0.08s ease, opacity 0.05s ease; }
+    .avatar-svg.is-blinking .av-eyelids { transform: scaleY(1); opacity: 1; }
+    .avatar-svg .av-mouth { display: none; }
+    .avatar-svg[data-mouth="rest"] .av-mouth-rest { display: inline; }
+    .avatar-svg[data-mouth="small"] .av-mouth-small { display: inline; }
+    .avatar-svg[data-mouth="medium"] .av-mouth-medium { display: inline; }
+    .avatar-svg[data-mouth="wide"] .av-mouth-wide { display: inline; }
+    .avatar-svg[data-mouth="round"] .av-mouth-round { display: inline; }
+    .avatar-copy-col { display: flex; flex-direction: column; justify-content: space-between; gap: 14px; min-width: 0; }
+    .avatar-copy-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .avatar-modal-title { font-size: 19px; font-weight: 500; color: var(--text-primary); }
+    .avatar-modal-meta { font-size: 12.5px; color: var(--text-secondary); margin-top: 3px; }
+    .avatar-script-box { flex: 1; background: #111318; border: 1px solid #282d36; border-radius: 10px; padding: 15px 17px; font-size: 15.5px; line-height: 1.65; color: #cfd6e0; overflow-y: auto; max-height: 195px; }
+    .av-word { transition: color 0.08s ease, background-color 0.08s ease; border-radius: 4px; padding: 0 1px; }
+    .av-word.is-active { color: #ffffff; background: rgba(96,174,255,0.28); }
+    .avatar-controls-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+    @media (max-width: 720px) {
+      .avatar-modal-grid { grid-template-columns: 1fr; justify-items: center; }
+      .avatar-copy-col { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -397,12 +445,16 @@
   </div>
 
   <main class="dashboard-main">
-    <section id="weatherman-briefing" class="briefing-card" aria-label="Today's Forecast Summary">
+    <section id="weatherman-briefing" class="briefing-card is-interactive" role="button" tabindex="0" aria-label="Today's Forecast Summary — Click to watch avatar briefing">
       <div class="briefing-badge">
         <span class="briefing-dot" aria-hidden="true"></span>
         <span>TODAY'S FORECAST</span>
       </div>
       <p id="weatherman-text" class="briefing-text">Loading today's forecast briefing...</p>
+      <button id="btn-watch-briefing" class="briefing-play-btn" type="button" aria-label="Watch Indie weather briefing">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"></polygon></svg>
+        <span>Watch Indie</span>
+      </button>
     </section>
 
     <section class="upper-grid">
@@ -672,6 +724,37 @@
     </div>
   </div>
 
+  <div id="avatar-briefing-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="avatar-modal-title">
+    <div class="avatar-modal-card">
+      <div class="avatar-modal-grid">
+        <div class="avatar-studio-col">
+          <div id="avatar-status-pill" class="avatar-status-pill">
+            <span class="avatar-status-dot" aria-hidden="true"></span>
+            <span id="avatar-status-text">READY &middot; INDIE ON ALTA CT</span>
+          </div>
+          <div id="avatar-stage" class="avatar-stage"></div>
+        </div>
+        <div class="avatar-copy-col">
+          <div class="avatar-copy-header">
+            <div>
+              <h2 id="avatar-modal-title" class="avatar-modal-title">Indie &middot; Today's Weather Briefing</h2>
+              <div id="avatar-modal-meta" class="avatar-modal-meta">Alta Ct &middot; Station 218212</div>
+            </div>
+            <button id="avatar-close" class="detail-nav-btn" type="button" title="Close" aria-label="Close">&times;</button>
+          </div>
+          <div id="avatar-script-text" class="avatar-script-box" aria-live="polite">Loading today's forecast briefing...</div>
+          <div class="avatar-controls-row">
+            <button id="avatar-toggle-speak" class="btn-primary" type="button">Replay Briefing</button>
+            <label class="checkbox-row">
+              <input id="avatar-autoplay-toggle" type="checkbox" />
+              <span>Auto-play on launch</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
   (function () {
     // =========================================================================
@@ -780,7 +863,10 @@
       statusDot: $('status-dot'), statusLabel: $('status-label'), lastUpdated: $('last-updated'),
       clockTime: $('clock-time'), clockAmPm: $('clock-ampm'), clockDate: $('clock-date'),
       noticeBanner: $('notice-banner'), noticeText: $('notice-text'), noticeAction: $('notice-action'),
-      weathermanText: $('weatherman-text'),
+      weathermanBriefing: $('weatherman-briefing'), weathermanText: $('weatherman-text'), btnWatchBriefing: $('btn-watch-briefing'),
+      avatarModal: $('avatar-briefing-modal'), avatarStage: $('avatar-stage'), avatarScriptText: $('avatar-script-text'),
+      avatarStatusPill: $('avatar-status-pill'), avatarStatusText: $('avatar-status-text'), avatarModalMeta: $('avatar-modal-meta'),
+      avatarToggleSpeak: $('avatar-toggle-speak'), avatarAutoplayToggle: $('avatar-autoplay-toggle'), avatarClose: $('avatar-close'),
       tempWhole: $('temp-whole'), tempUnit: $('temp-unit'), tempDecimal: $('temp-decimal'),
       feelsLikeVal: $('feels-like-val'), heroIcon: $('hero-icon'), conditionTitle: $('condition-title'),
       conditionSummary: $('condition-summary'), todayLowVal: $('today-low-val'), todayHighVal: $('today-high-val'),
@@ -809,6 +895,7 @@
       detailPrev: $('detail-prev'), detailNext: $('detail-next'), detailClose: $('detail-close'),
     };
     let activeDetailDayIdx = null;
+    let lastBriefingText = '';
 
     /* ---------- Moon Phase ---------- */
     function getMoonPhase(date) {
@@ -1581,8 +1668,16 @@
       els.heroIcon.innerHTML = getWeatherIconSvg(cur.icon, 54);
       els.conditionTitle.textContent = cur.conditions || 'Clear';
       els.conditionSummary.textContent = cur.summary || '';
+      const briefingStr = cur.forecastBriefing || buildBriefingFromDashboard(data);
+      lastBriefingText = briefingStr;
       if (els.weathermanText) {
-        els.weathermanText.textContent = cur.forecastBriefing || buildBriefingFromDashboard(data);
+        els.weathermanText.textContent = briefingStr;
+      }
+      if (!avatarCtrl.autoPlayedOnce && avatarCtrl.isAutoPlayEnabled() && !data.isDemo) {
+        avatarCtrl.autoPlayedOnce = true;
+        openAvatarBriefing(true);
+      } else if (els.avatarModal && !els.avatarModal.classList.contains('hidden') && !avatarCtrl.speaking) {
+        syncAvatarModalVisual();
       }
 
       const low = Number(cur.todayLow ?? tVal - 5), high = Number(cur.todayHigh ?? tVal + 5);
@@ -1836,6 +1931,284 @@
     function openDayDetail(idx) { renderDayDetail(idx); els.dayDetailModal.classList.remove('hidden'); if (els.detailHourlyScroll) els.detailHourlyScroll.scrollLeft = 0; }
     function closeDayDetail() { activeDetailDayIdx = null; els.dayDetailModal.classList.add('hidden'); }
 
+    /* ---------- Illustrated Weathercaster Avatar & Speech Engine ---------- */
+    function expandSpokenToken(word) {
+      let w = String(word || '');
+      w = w.replace(/(-?\d+(?:\.\d+)?)°F\b/gi, '$1 degrees');
+      w = w.replace(/(-?\d+(?:\.\d+)?)°C\b/gi, '$1 degrees Celsius');
+      w = w.replace(/(-?\d+(?:\.\d+)?)°(?=[.,!?;:]|$)/g, '$1 degrees');
+      w = w.replace(/\bmph\b/gi, 'miles per hour');
+      w = w.replace(/\bkm\/h\b/gi, 'kilometers per hour');
+      w = w.replace(/(\d+)%/g, '$1 percent');
+      const cardinals = {
+        N: 'north', NNE: 'north-northeast', NE: 'northeast', ENE: 'east-northeast',
+        E: 'east', ESE: 'east-southeast', SE: 'southeast', SSE: 'south-southeast',
+        S: 'south', SSW: 'south-southwest', SW: 'southwest', WSW: 'west-southwest',
+        W: 'west', WNW: 'west-northwest', NW: 'northwest', NNW: 'north-northwest',
+      };
+      w = w.replace(/^([NSEW]{1,3})([.,!?;:]*)$/, (m, dir, punc) => cardinals[dir] ? `${cardinals[dir]}${punc}` : m);
+      return w;
+    }
+
+    function formatIndieForecastScript(rawText) {
+      const clean = String(rawText || '').trim().replace(/\s+/g, ' ');
+      const intro = "Hi, I'm Indie, your Morro Bay Alta Court weather girl. Today's forecast calls for ";
+      if (!clean) return `${intro}mild coastal weather.`;
+      if (/^hi,\s*i['’]m indie/i.test(clean)) return clean;
+      let body = clean
+        .replace(/^Good morning!\s*Expect\s+/i, '')
+        .replace(/^This afternoon brings\s+/i, '')
+        .replace(/^Good evening!\s*Expect\s+/i, '')
+        .replace(/^Tonight brings\s+/i, '');
+      if (/^[A-Z][a-z]/.test(body)) body = body.charAt(0).toLowerCase() + body.slice(1);
+      return `${intro}${body}`;
+    }
+
+    function buildSpeechScript(displayText) {
+      const clean = formatIndieForecastScript(displayText);
+      if (!clean) return { displayWords: [], spokenText: '', wordBounds: [] };
+      const displayWords = clean.split(' ');
+      const spokenParts = [];
+      const wordBounds = [];
+      let cursor = 0;
+      for (let i = 0; i < displayWords.length; i++) {
+        const sp = expandSpokenToken(displayWords[i]);
+        const start = cursor;
+        const end = cursor + sp.length;
+        wordBounds.push({ wordIdx: i, start, end });
+        spokenParts.push(sp);
+        cursor = end + 1;
+      }
+      return { displayWords, spokenText: spokenParts.join(' '), wordBounds };
+    }
+
+    function getSkyPalette(iconCode) {
+      const c = String(iconCode || '').toLowerCase();
+      if (c.includes('thunder')) return { top: '#181e30', mid: '#2b344d', bot: '#3e4761', accent: '#fbbf24', mode: 'storm' };
+      if (c.includes('rain') || c.includes('sleet') || c.includes('snow')) return { top: '#1a2a3a', mid: '#2c4459', bot: '#44627a', accent: '#38bdf8', mode: 'rain' };
+      if (c.includes('night')) return { top: '#0c1428', mid: '#172544', bot: '#243a61', accent: '#7dd3fc', mode: 'night' };
+      if (c.includes('cloudy') && !c.includes('partly')) return { top: '#243447', mid: '#3a4f66', bot: '#566d85', accent: '#93c5fd', mode: 'cloudy' };
+      if (c.includes('partly')) return { top: '#1d4b7a', mid: '#3772a3', bot: '#d48d59', accent: '#f5a623', mode: 'partly' };
+      return { top: '#1c538a', mid: '#3b82bd', bot: '#e39a5d', accent: '#fbbf24', mode: 'sunny' };
+    }
+
+    function renderAvatarSvg(iconCode, tempText, condText) {
+      const sky = getSkyPalette(iconCode);
+      const weatherIcon = getWeatherIconSvg(iconCode, 34);
+      let skyFx = '';
+      if (sky.mode === 'night') {
+        skyFx = '<circle cx="42" cy="36" r="1.4" fill="#e2e8f0" opacity="0.85"/><circle cx="76" cy="24" r="1.1" fill="#e2e8f0" opacity="0.7"/><circle cx="115" cy="42" r="1.3" fill="#bae6fd" opacity="0.8"/><circle cx="60" cy="64" r="1" fill="#e2e8f0" opacity="0.6"/><path d="M46 46 A14 14 0 1 0 60 60 A11 11 0 1 1 46 46 Z" fill="#bae6fd" opacity="0.55"/>';
+      } else if (sky.mode === 'rain' || sky.mode === 'storm') {
+        skyFx = '<g stroke="#7dd3fc" stroke-width="1.5" stroke-linecap="round" opacity="0.35"><line x1="34" y1="26" x2="26" y2="48"/><line x1="68" y1="18" x2="60" y2="40"/><line x1="94" y1="44" x2="86" y2="66"/><line x1="234" y1="92" x2="226" y2="114"/><line x1="256" y1="120" x2="248" y2="142"/></g>';
+      } else {
+        skyFx = `<circle cx="48" cy="48" r="36" fill="${sky.accent}" opacity="0.16"/><circle cx="48" cy="48" r="18" fill="${sky.accent}" opacity="0.28"/>`;
+      }
+      return `
+        <svg class="avatar-svg" viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Animated weathercaster avatar Indie">
+          <defs>
+            <linearGradient id="avSkyGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${sky.top}"/><stop offset="58%" stop-color="${sky.mid}"/><stop offset="100%" stop-color="${sky.bot}"/></linearGradient>
+            <radialGradient id="avStudioGlow" cx="50%" cy="42%" r="60%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.14"/><stop offset="100%" stop-color="#0b0e14" stop-opacity="0.28"/></radialGradient>
+            <linearGradient id="avHairBack" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0%" stop-color="#d4984c"/><stop offset="52%" stop-color="#9c6427"/><stop offset="100%" stop-color="#6e4115"/></linearGradient>
+            <linearGradient id="avHairFront" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0%" stop-color="#f2c472"/><stop offset="45%" stop-color="#cf9042"/><stop offset="100%" stop-color="#965d22"/></linearGradient>
+            <linearGradient id="avSkin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f7cab0"/><stop offset="65%" stop-color="#eab28f"/><stop offset="100%" stop-color="#dc9c76"/></linearGradient>
+            <linearGradient id="avNeckShadow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#b8744e" stop-opacity="0.58"/><stop offset="55%" stop-color="#e5a985" stop-opacity="0"/></linearGradient>
+            <linearGradient id="avBlazer" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0%" stop-color="#27466e"/><stop offset="100%" stop-color="#14263f"/></linearGradient>
+            <linearGradient id="avBlouse" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#dce4ee"/></linearGradient>
+          </defs>
+          <rect width="280" height="280" fill="url(#avSkyGrad)"/><rect width="280" height="280" fill="url(#avStudioGlow)"/>${skyFx}
+          <path d="M0 228 Q70 214 140 224 T280 220 L280 280 L0 280 Z" fill="#0f172a" opacity="0.35"/>
+          <g transform="translate(184, 14)">
+            <rect x="0" y="0" width="84" height="68" rx="10" fill="rgba(14, 18, 26, 0.72)" stroke="rgba(96, 174, 255, 0.45)" stroke-width="1.2"/>
+            <g transform="translate(8, 7)">${weatherIcon}</g>
+            <text x="47" y="30" fill="#f8fafc" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="600">${tempText}</text>
+            <text x="42" y="56" text-anchor="middle" fill="#a4b8cf" font-family="Inter, system-ui, sans-serif" font-size="8.5" font-weight="500">${String(condText || '').slice(0, 14)}</text>
+          </g>
+          <path d="M78 106 C66 138, 60 185, 65 232 C76 244, 96 246, 108 238 L172 238 C184 246, 204 244, 215 232 C220 185, 214 138, 202 106 C194 64, 170 42, 140 42 C110 42, 86 64, 78 106 Z" fill="url(#avHairBack)"/>
+          <g class="av-torso">
+            <path d="M122 162 L122 204 Q140 215 158 204 L158 162 Z" fill="url(#avSkin)"/>
+            <path d="M122 162 L122 192 Q140 198 158 192 L158 162 Z" fill="url(#avNeckShadow)"/>
+            <path d="M98 206 Q140 195 182 206 L192 280 L88 280 Z" fill="url(#avBlouse)"/>
+            <path d="M116 208 Q128 214 136 212 M164 208 Q152 214 144 212" stroke="#d99a74" stroke-width="1.3" stroke-linecap="round" fill="none" opacity="0.65"/>
+            <path d="M121 200 Q140 225 159 200" stroke="#e5b869" stroke-width="1.4" fill="none"/>
+            <circle cx="140" cy="215" r="2.6" fill="#f3cd7a" stroke="#b98936" stroke-width="0.6"/>
+            <path d="M52 280 C55 242, 68 214, 98 203 L122 197 L137 265 L140 280 L52 280 Z" fill="url(#avBlazer)"/>
+            <path d="M228 280 C225 242, 212 214, 182 203 L158 197 L143 265 L140 280 L228 280 Z" fill="url(#avBlazer)"/>
+            <polygon points="122,197 104,218 118,225 110,242 138,266" fill="#1b3557" stroke="#315785" stroke-width="0.9"/>
+            <polygon points="158,197 176,218 162,225 170,242 142,266" fill="#1b3557" stroke="#315785" stroke-width="0.9"/>
+            <rect x="163" y="232" width="4.5" height="8" rx="2" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
+            <circle cx="165.2" cy="234" r="1.4" fill="#60aeff"/>
+          </g>
+          <g class="av-head">
+            <ellipse cx="94" cy="126" rx="6.5" ry="11" fill="#e5a884"/><ellipse cx="186" cy="126" rx="6.5" ry="11" fill="#e5a884"/>
+            <circle cx="93.5" cy="133.5" r="2.3" fill="#f3cd7a"/><circle cx="186.5" cy="133.5" r="2.3" fill="#f3cd7a"/>
+            <path d="M96 105 C95 142, 111 174, 140 177 C169 174, 185 142, 184 105 C184 73, 166 56, 140 56 C114 56, 96 73, 96 105 Z" fill="url(#avSkin)"/>
+            <ellipse cx="111" cy="135" rx="11" ry="6" fill="#e37c68" opacity="0.24"/><ellipse cx="169" cy="135" rx="11" ry="6" fill="#e37c68" opacity="0.24"/>
+            <path d="M115 141 Q112 148 117 154" stroke="#c88563" stroke-width="1" fill="none" opacity="0.35"/><path d="M165 141 Q168 148 163 154" stroke="#c88563" stroke-width="1" fill="none" opacity="0.35"/>
+            <path d="M139 112 L136.5 129 Q140 134 144.5 130" stroke="#c5825d" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+            <path d="M136 131 Q140 134 144 131" stroke="#b9724e" stroke-width="1" fill="none" opacity="0.55"/>
+            <g class="av-brows"><path d="M107 103 Q119 97 131 102" stroke="#855628" stroke-width="2.7" stroke-linecap="round" fill="none"/><path d="M149 102 Q161 97 173 103" stroke="#855628" stroke-width="2.7" stroke-linecap="round" fill="none"/></g>
+            <g class="av-eyes">
+              <path d="M108 115 Q120 107 131 115 Q120 122 108 115 Z" fill="#ffffff"/>
+              <circle cx="119.5" cy="114.8" r="5.2" fill="#2c6eb5"/><circle cx="119.5" cy="114.8" r="3.4" fill="#4e9ae8"/><circle cx="119.5" cy="114.8" r="2.2" fill="#0f172a"/><circle cx="121.2" cy="113.1" r="1.3" fill="#ffffff"/>
+              <path d="M107.5 115 Q120 106.5 131.5 115" stroke="#362214" stroke-width="2.1" stroke-linecap="round" fill="none"/>
+              <path d="M149 115 Q160 107 172 115 Q160 122 149 115 Z" fill="#ffffff"/>
+              <circle cx="160.5" cy="114.8" r="5.2" fill="#2c6eb5"/><circle cx="160.5" cy="114.8" r="3.4" fill="#4e9ae8"/><circle cx="160.5" cy="114.8" r="2.2" fill="#0f172a"/><circle cx="162.2" cy="113.1" r="1.3" fill="#ffffff"/>
+              <path d="M148.5 115 Q160 106.5 172.5 115" stroke="#362214" stroke-width="2.1" stroke-linecap="round" fill="none"/>
+            </g>
+            <g class="av-eyelids"><path d="M107 115 Q120 106 132 115 Q120 123 107 115 Z" fill="#e8af8c"/><path d="M148 115 Q160 106 173 115 Q160 123 148 115 Z" fill="#e8af8c"/></g>
+            <g class="av-mouth-wrap">
+              <g class="av-mouth av-mouth-rest"><path d="M123 149 Q140 160 157 149 Q140 153 123 149 Z" fill="#ffffff"/><path d="M122 149 Q140 154 158 149" stroke="#ba5e5a" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M124 150 Q140 163 156 150" stroke="#c86b66" stroke-width="2.3" stroke-linecap="round" fill="none"/></g>
+              <g class="av-mouth av-mouth-small"><path d="M124 149 Q140 146 156 149 Q140 160 124 149 Z" fill="#5e2124"/><path d="M127 149 Q140 148 153 149 L151 152 Q140 153 129 152 Z" fill="#ffffff"/><path d="M124 149 Q140 146 156 149 Q140 161 124 149 Z" stroke="#c0615d" stroke-width="2" fill="none"/></g>
+              <g class="av-mouth av-mouth-medium"><path d="M123 148 Q140 144 157 148 Q154 164 140 164 Q126 164 123 148 Z" fill="#561b1e"/><path d="M126 148 Q140 146 154 148 L152 152 Q140 153 128 152 Z" fill="#ffffff"/><ellipse cx="140" cy="160" rx="8" ry="3.2" fill="#c96b6d"/><path d="M123 148 Q140 144 157 148 Q154 164 140 164 Q126 164 123 148 Z" stroke="#c0615d" stroke-width="2.1" fill="none"/></g>
+              <g class="av-mouth av-mouth-wide"><path d="M124 147 Q140 143 156 147 Q155 168 140 168 Q125 168 124 147 Z" fill="#4f171a"/><path d="M127 147 Q140 145 153 147 L151 152 Q140 153 129 152 Z" fill="#ffffff"/><ellipse cx="140" cy="162.5" rx="9" ry="4" fill="#ce7072"/><path d="M124 147 Q140 143 156 147 Q155 168 140 168 Q125 168 124 147 Z" stroke="#c0615d" stroke-width="2.1" fill="none"/></g>
+              <g class="av-mouth av-mouth-round"><ellipse cx="140" cy="155" rx="8.5" ry="7.8" fill="#561b1e" stroke="#c0615d" stroke-width="2.4"/><ellipse cx="140" cy="159.5" rx="4.5" ry="2.2" fill="#c96b6d"/></g>
+            </g>
+            <path d="M126 48 C102 49, 82 69, 77 104 C72 135, 76 172, 86 206 C92 184, 93 150, 96 122 C99 95, 110 75, 128 65 Z" fill="url(#avHairFront)"/>
+            <path d="M125 48 C154 44, 188 64, 198 102 C207 136, 203 176, 193 209 C187 184, 187 150, 183 122 C179 92, 160 72, 126 65 Z" fill="url(#avHairFront)"/>
+            <path d="M125 48 C116 62, 102 78, 92 92 C98 71, 110 53, 125 48 Z" fill="#e9b764" opacity="0.72"/>
+            <path d="M126 49 C145 55, 166 72, 179 94 C168 68, 149 52, 126 49 Z" fill="#f3ca7d" opacity="0.65"/>
+            <path d="M108 64 Q89 96 86 148" stroke="#fbe3a4" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.48"/>
+            <path d="M158 58 Q186 88 192 146" stroke="#fbe3a4" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.48"/>
+            <path d="M170 72 Q194 114 190 176" stroke="#f5d186" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.38"/>
+          </g>
+        </svg>`;
+    }
+
+    const avatarCtrl = {
+      speaking: false,
+      scriptData: { displayWords: [], spokenText: '', wordBounds: [] },
+      activeWordIdx: -1,
+      cadenceTimer: null,
+      mouthIdx: 0,
+      autoPlayedOnce: false,
+      isAutoPlayEnabled() { return safeStore.get('tempest_gs_avatar_autoplay', 'false') === 'true'; },
+      setAutoPlayEnabled(val) { safeStore.set('tempest_gs_avatar_autoplay', val ? 'true' : 'false'); },
+      setMouth(shape) {
+        const svg = els.avatarStage && els.avatarStage.querySelector('.avatar-svg');
+        if (svg) svg.setAttribute('data-mouth', shape || 'rest');
+      },
+      highlightWord(idx) {
+        if (!els.avatarScriptText || idx === this.activeWordIdx) return;
+        const prev = els.avatarScriptText.querySelector('.av-word.is-active');
+        if (prev) prev.classList.remove('is-active');
+        this.activeWordIdx = idx;
+        if (idx >= 0) {
+          const next = els.avatarScriptText.querySelector(`.av-word[data-widx="${idx}"]`);
+          if (next) next.classList.add('is-active');
+          const clean = String(this.scriptData.displayWords[idx] || '').toLowerCase();
+          const shape = /[o0]/.test(clean) && !/[aeiou]{2}/.test(clean) ? 'round' : /[a]|igh|ay/.test(clean) ? 'wide' : /[eiuy]/.test(clean) ? 'medium' : 'small';
+          this.setMouth(shape);
+        }
+      },
+      handleBoundary(charIndex) {
+        const bounds = this.scriptData.wordBounds;
+        for (let i = 0; i < bounds.length; i++) {
+          if (charIndex <= bounds[i].end) { this.highlightWord(bounds[i].wordIdx); return; }
+        }
+      },
+      setSpeakingState(isSpeaking) {
+        this.speaking = isSpeaking;
+        const svg = els.avatarStage && els.avatarStage.querySelector('.avatar-svg');
+        if (svg) svg.classList.toggle('is-speaking', isSpeaking);
+        if (els.avatarStatusPill) els.avatarStatusPill.classList.toggle('is-live', isSpeaking);
+        if (els.avatarStatusText) els.avatarStatusText.textContent = isSpeaking ? 'ON AIR · INDIE LIVE' : 'READY · INDIE ON ALTA CT';
+        if (els.avatarToggleSpeak) els.avatarToggleSpeak.textContent = isSpeaking ? 'Stop Indie' : 'Replay Briefing';
+        if (this.cadenceTimer) { clearInterval(this.cadenceTimer); this.cadenceTimer = null; }
+        if (isSpeaking) {
+          const shapes = ['small', 'medium', 'wide', 'small', 'round', 'medium'];
+          this.cadenceTimer = setInterval(() => {
+            if (!this.speaking) return;
+            this.mouthIdx = (this.mouthIdx + 1) % shapes.length;
+            this.setMouth(shapes[this.mouthIdx]);
+          }, 160);
+        } else {
+          this.setMouth('rest');
+          this.highlightWord(-1);
+        }
+      },
+      updateVisual(text, iconCode, tempText, condText) {
+        this.scriptData = buildSpeechScript(text);
+        if (els.avatarStage) els.avatarStage.innerHTML = renderAvatarSvg(iconCode, tempText, condText);
+        if (els.avatarScriptText) {
+          els.avatarScriptText.innerHTML = this.scriptData.displayWords.length
+            ? this.scriptData.displayWords.map((w, i) => `<span class="av-word" data-widx="${i}">${w.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`).join(' ')
+            : 'Forecast briefing unavailable.';
+        }
+        this.setMouth('rest');
+      },
+      speak() {
+        this.stop();
+        const spoken = this.scriptData.spokenText;
+        if (!spoken) return;
+        if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+          if (els.avatarStatusText) els.avatarStatusText.textContent = 'SPEECH UNAVAILABLE IN THIS BROWSER';
+          this.setSpeakingState(false);
+          return;
+        }
+        try {
+          window.speechSynthesis.cancel();
+          const utt = new SpeechSynthesisUtterance(spoken);
+          utt.rate = 0.90; utt.pitch = 0.94;
+          const voices = window.speechSynthesis.getVoices() || [];
+          const pref = ['microsoft aria', 'microsoft jenny', 'microsoft ava', 'microsoft emma', 'google us english', 'samantha', 'ava', 'allison', 'victoria', 'serena', 'karen', 'tessa', 'zira', 'female'];
+          let v = null;
+          for (const p of pref) { v = voices.find((x) => x.name.toLowerCase().includes(p)); if (v) break; }
+          const malePat = /\b(male|david|mark|guy|daniel|alex|fred|aaron|arthur|ryan|andrew|brian|christopher|eric|steffan|george|james|richard)\b/i;
+          if (!v) v = voices.find((x) => /^en[-_]US/i.test(x.lang) && !malePat.test(x.name)) || voices.find((x) => /^en/i.test(x.lang) && !malePat.test(x.name)) || voices.find((x) => /^en[-_]US/i.test(x.lang));
+          if (v) utt.voice = v;
+          utt.onstart = () => this.setSpeakingState(true);
+          utt.onboundary = (e) => { if (typeof e.charIndex === 'number') this.handleBoundary(e.charIndex); };
+          utt.onend = () => this.setSpeakingState(false);
+          utt.onerror = () => this.setSpeakingState(false);
+          this.setSpeakingState(true);
+          window.speechSynthesis.speak(utt);
+        } catch {
+          this.setSpeakingState(false);
+        }
+      },
+      stop() {
+        if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch {} }
+        this.setSpeakingState(false);
+      },
+    };
+
+    (function blinkLoop() {
+      setTimeout(() => {
+        const svg = els.avatarStage && els.avatarStage.querySelector('.avatar-svg');
+        if (svg) { svg.classList.add('is-blinking'); setTimeout(() => svg.classList.remove('is-blinking'), 160); }
+        blinkLoop();
+      }, 2800 + Math.random() * 2800);
+    })();
+
+    function syncAvatarModalVisual() {
+      const d = state.data, cur = (d && d.current) || {}, st = (d && d.station) || {};
+      const uc = d && d.units === 'metric' ? '°C' : '°F';
+      const tt = typeof cur.temperature === 'number' ? `${Math.round(cur.temperature)}${uc}` : `--${uc}`;
+      if (els.avatarModalMeta) els.avatarModalMeta.textContent = `${st.name || 'Alta Ct'} · Station ${st.stationId || state.stationId}`;
+      if (els.avatarAutoplayToggle) els.avatarAutoplayToggle.checked = avatarCtrl.isAutoPlayEnabled();
+      avatarCtrl.updateVisual(lastBriefingText || (els.weathermanText && els.weathermanText.textContent) || '', cur.icon || 'partly-cloudy-day', tt, cur.conditions || 'Clear');
+    }
+    function openAvatarBriefing(speakNow) {
+      if (!els.avatarModal) return;
+      syncAvatarModalVisual();
+      els.avatarModal.classList.remove('hidden');
+      if (speakNow !== false) avatarCtrl.speak();
+    }
+    function closeAvatarBriefing() {
+      avatarCtrl.stop();
+      if (els.avatarModal) els.avatarModal.classList.add('hidden');
+    }
+
+    if (els.weathermanBriefing) {
+      els.weathermanBriefing.addEventListener('click', () => openAvatarBriefing(true));
+      els.weathermanBriefing.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAvatarBriefing(true); } });
+    }
+    if (els.btnWatchBriefing) els.btnWatchBriefing.addEventListener('click', (e) => { e.stopPropagation(); openAvatarBriefing(true); });
+    if (els.avatarClose) els.avatarClose.addEventListener('click', closeAvatarBriefing);
+    if (els.avatarModal) els.avatarModal.addEventListener('click', (e) => { if (e.target === els.avatarModal) closeAvatarBriefing(); });
+    if (els.avatarToggleSpeak) els.avatarToggleSpeak.addEventListener('click', () => { if (avatarCtrl.speaking) avatarCtrl.stop(); else avatarCtrl.speak(); });
+    if (els.avatarAutoplayToggle) els.avatarAutoplayToggle.addEventListener('change', (e) => { avatarCtrl.setAutoPlayEnabled(Boolean(e.target.checked)); });
+
     els.detailClose.addEventListener('click', closeDayDetail);
     els.detailPrev.addEventListener('click', () => { if (activeDetailDayIdx > 0) openDayDetail(activeDetailDayIdx - 1); });
     els.detailNext.addEventListener('click', () => { const mx = Math.min(14, ((state.data && state.data.daily && state.data.daily.length) || 1) - 1); if (activeDetailDayIdx < mx) openDayDetail(activeDetailDayIdx + 1); });
@@ -1847,7 +2220,7 @@
     els.modalClose.addEventListener('click', closeModal);
     els.modal.addEventListener('click', (e) => { if (e.target === els.modal) closeModal(); });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { closeModal(); closeDayDetail(); }
+      if (e.key === 'Escape') { closeModal(); closeDayDetail(); closeAvatarBriefing(); }
       else if (!els.dayDetailModal.classList.contains('hidden')) {
         if (e.key === 'ArrowLeft' && activeDetailDayIdx > 0) openDayDetail(activeDetailDayIdx - 1);
         if (e.key === 'ArrowRight' && activeDetailDayIdx < Math.min(14, ((state.data && state.data.daily && state.data.daily.length) || 1) - 1)) openDayDetail(activeDetailDayIdx + 1);

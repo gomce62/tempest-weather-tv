@@ -87,12 +87,18 @@
   <!-- Main Dashboard Content -->
   <main class="dashboard-main">
     <!-- Today's Forecast Briefing (Broadcast Weatherman Summary) -->
-    <section id="weatherman-briefing" class="briefing-card" aria-label="Today's Forecast Summary">
+    <section id="weatherman-briefing" class="briefing-card is-interactive" role="button" tabindex="0" aria-label="Today's Forecast Summary — Click to watch avatar briefing">
       <div class="briefing-badge">
         <span class="briefing-dot" aria-hidden="true"></span>
         <span>TODAY'S FORECAST</span>
       </div>
       <p id="weatherman-text" class="briefing-text">Loading today's forecast briefing...</p>
+      <button id="btn-watch-briefing" class="briefing-play-btn" type="button" aria-label="Watch Indie weather briefing">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <polygon points="6,4 20,12 6,20"></polygon>
+        </svg>
+        <span>Watch Indie</span>
+      </button>
     </section>
 
     <!-- Top Section: Hero Current Conditions + 6 Metric Cards -->
@@ -431,6 +437,42 @@
           <button type="submit" class="btn-primary">Connect &amp; Save</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Avatar Weather Briefing Modal -->
+  <div id="avatar-briefing-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="avatar-modal-title">
+    <div class="avatar-modal-card">
+      <div class="avatar-modal-grid">
+        <div class="avatar-studio-col">
+          <div id="avatar-status-pill" class="avatar-status-pill">
+            <span class="avatar-status-dot" aria-hidden="true"></span>
+            <span id="avatar-status-text">READY &middot; INDIE ON ALTA CT</span>
+          </div>
+          <div id="avatar-stage" class="avatar-stage"></div>
+        </div>
+        <div class="avatar-copy-col">
+          <div class="avatar-copy-header">
+            <div>
+              <h2 id="avatar-modal-title" class="avatar-modal-title">Indie &middot; Today's Weather Briefing</h2>
+              <div id="avatar-modal-meta" class="avatar-modal-meta">Alta Ct &middot; Station 218212</div>
+            </div>
+            <button id="avatar-close" class="detail-nav-btn" type="button" title="Close" aria-label="Close">&times;</button>
+          </div>
+
+          <div id="avatar-script-text" class="avatar-script-box" aria-live="polite">
+            Loading today's forecast briefing...
+          </div>
+
+          <div class="avatar-controls-row">
+            <button id="avatar-toggle-speak" class="btn-primary avatar-speak-btn" type="button">Replay Briefing</button>
+            <label class="checkbox-row avatar-autoplay-label">
+              <input id="avatar-autoplay-toggle" type="checkbox" />
+              <span>Auto-play on launch</span>
+            </label>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

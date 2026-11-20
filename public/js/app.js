@@ -18,6 +18,7 @@ import {
   degreesToCardinal,
   buildWeathermanBriefingFromDashboard,
 } from './tempest-client.js';
+import { WeatherAvatarController } from './avatar.js';
 
 const STORAGE_KEYS = {
   stationId: 'tempest_station_id',
@@ -55,7 +56,19 @@ const els = {
   noticeText: document.getElementById('notice-text'),
   noticeAction: document.getElementById('notice-action'),
 
+  weathermanBriefing: document.getElementById('weatherman-briefing'),
   weathermanText: document.getElementById('weatherman-text'),
+  btnWatchBriefing: document.getElementById('btn-watch-briefing'),
+
+  avatarModal: document.getElementById('avatar-briefing-modal'),
+  avatarStage: document.getElementById('avatar-stage'),
+  avatarScriptText: document.getElementById('avatar-script-text'),
+  avatarStatusPill: document.getElementById('avatar-status-pill'),
+  avatarStatusText: document.getElementById('avatar-status-text'),
+  avatarModalMeta: document.getElementById('avatar-modal-meta'),
+  avatarToggleSpeak: document.getElementById('avatar-toggle-speak'),
+  avatarAutoplayToggle: document.getElementById('avatar-autoplay-toggle'),
+  avatarClose: document.getElementById('avatar-close'),
 
   tempWhole: document.getElementById('temp-whole'),
   tempUnit: document.getElementById('temp-unit'),
@@ -149,6 +162,16 @@ const els = {
 };
 
 let activeDetailDayIdx = null;
+let lastBriefingText = '';
+
+const avatarController = new WeatherAvatarController({
+  stageEl: els.avatarStage,
+  scriptEl: els.avatarScriptText,
+  statusPillEl: els.avatarStatusPill,
+  statusTextEl: els.avatarStatusText,
+  btnToggleSpeak: els.avatarToggleSpeak,
+  autoplayStorageKey: 'tempest_avatar_autoplay',
+});
 
 const tempestWs = new TempestWebSocket({
   onStatus: (status) => {
@@ -401,8 +424,16 @@ function renderDashboard(data) {
   els.heroIcon.innerHTML = getWeatherIconSvg(cur.icon, 54);
   els.conditionTitle.textContent = cur.conditions || 'Clear';
   els.conditionSummary.textContent = cur.summary || '';
+  const briefingStr = cur.forecastBriefing || buildWeathermanBriefingFromDashboard(data);
+  lastBriefingText = briefingStr;
   if (els.weathermanText) {
-    els.weathermanText.textContent = cur.forecastBriefing || buildWeathermanBriefingFromDashboard(data);
+    els.weathermanText.textContent = briefingStr;
+  }
+  if (!avatarController.autoPlayedOnce && avatarController.isAutoPlayEnabled() && !data.isDemo) {
+    avatarController.autoPlayedOnce = true;
+    openAvatarBriefing(true);
+  } else if (els.avatarModal && !els.avatarModal.classList.contains('hidden') && !avatarController.speaking) {
+    syncAvatarModalVisual();
   }
 
   // Daily Low / High Range Bar
@@ -852,11 +883,78 @@ function closeSettingsModal() {
   els.modal.classList.add('hidden');
 }
 
+function syncAvatarModalVisual() {
+  const d = state.data;
+  const cur = d?.current || {};
+  const st = d?.station || {};
+  const unitChar = d?.units === 'metric' ? '°C' : '°F';
+  const tempNum = typeof cur.temperature === 'number' ? `${Math.round(cur.temperature)}${unitChar}` : `--${unitChar}`;
+  if (els.avatarModalMeta) {
+    els.avatarModalMeta.textContent = `${st.name || 'Alta Ct'} · Station ${st.stationId || state.stationId}`;
+  }
+  if (els.avatarAutoplayToggle) {
+    els.avatarAutoplayToggle.checked = avatarController.isAutoPlayEnabled();
+  }
+  avatarController.updateVisual({
+    text: lastBriefingText || els.weathermanText?.textContent || '',
+    iconCode: cur.icon || 'partly-cloudy-day',
+    tempText: tempNum,
+    condText: cur.conditions || 'Clear',
+  });
+}
+
+function openAvatarBriefing(speakNow = true) {
+  if (!els.avatarModal) return;
+  syncAvatarModalVisual();
+  els.avatarModal.classList.remove('hidden');
+  if (speakNow) {
+    avatarController.speak();
+  }
+}
+
+function closeAvatarBriefing() {
+  avatarController.stop();
+  if (els.avatarModal) els.avatarModal.classList.add('hidden');
+}
+
 function bindEvents() {
   els.stationBadge.addEventListener('click', openSettingsModal);
   els.btnSettings.addEventListener('click', openSettingsModal);
   els.noticeAction.addEventListener('click', openSettingsModal);
   els.modalClose.addEventListener('click', closeSettingsModal);
+
+  if (els.weathermanBriefing) {
+    els.weathermanBriefing.addEventListener('click', () => openAvatarBriefing(true));
+    els.weathermanBriefing.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openAvatarBriefing(true);
+      }
+    });
+  }
+  if (els.btnWatchBriefing) {
+    els.btnWatchBriefing.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openAvatarBriefing(true);
+    });
+  }
+  if (els.avatarClose) els.avatarClose.addEventListener('click', closeAvatarBriefing);
+  if (els.avatarModal) {
+    els.avatarModal.addEventListener('click', (e) => {
+      if (e.target === els.avatarModal) closeAvatarBriefing();
+    });
+  }
+  if (els.avatarToggleSpeak) {
+    els.avatarToggleSpeak.addEventListener('click', () => {
+      if (avatarController.speaking) avatarController.stop();
+      else avatarController.speak();
+    });
+  }
+  if (els.avatarAutoplayToggle) {
+    els.avatarAutoplayToggle.addEventListener('change', (e) => {
+      avatarController.setAutoPlayEnabled(Boolean(e.target.checked));
+    });
+  }
 
   els.modal.addEventListener('click', (e) => {
     if (e.target === els.modal) closeSettingsModal();
@@ -880,6 +978,7 @@ function bindEvents() {
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (els.avatarModal && !els.avatarModal.classList.contains('hidden')) closeAvatarBriefing();
       if (!els.dayDetailModal.classList.contains('hidden')) closeDayDetail();
       if (!els.modal.classList.contains('hidden')) closeSettingsModal();
     } else if (!els.dayDetailModal.classList.contains('hidden')) {
