@@ -25,6 +25,38 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     @Volatile
     private var ttsReady: Boolean = false
+    @Volatile
+    private var activeUtteranceId: String? = null
+    private var utteranceSeq: Long = 0
+
+    private fun selectBestFemaleVoice() {
+        try {
+            val voices = tts?.voices ?: return
+            val preferredFemale = listOf("en-us-x-tpf", "en-us-x-sfg", "en-us-x-tpc", "en-us-x-iob", "f00", "female")
+            val excludedMale = listOf("iol", "iom", "iog", "tpd", "m00", "male")
+            val bestVoice = voices.firstOrNull { v ->
+                val n = (v.name ?: "").lowercase(Locale.US)
+                v.locale?.language == "en" &&
+                    v.locale?.country == "US" &&
+                    preferredFemale.any { p -> n.contains(p) } &&
+                    !v.isNetworkConnectionRequired
+            } ?: voices.firstOrNull { v ->
+                val n = (v.name ?: "").lowercase(Locale.US)
+                v.locale?.language == "en" &&
+                    v.locale?.country == "US" &&
+                    preferredFemale.any { p -> n.contains(p) }
+            } ?: voices.firstOrNull { v ->
+                val n = (v.name ?: "").lowercase(Locale.US)
+                v.locale?.language == "en" &&
+                    v.locale?.country == "US" &&
+                    !v.isNetworkConnectionRequired &&
+                    excludedMale.none { m -> n.contains(m) }
+            }
+            if (bestVoice != null) {
+                tts?.voice = bestVoice
+            }
+        } catch (_: Exception) {}
+    }
 
     inner class AndroidTtsBridge {
         @JavascriptInterface
@@ -37,11 +69,15 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             val clampedPitch = pitch.coerceIn(0.5f, 2.0f)
             runOnUiThread {
                 try {
+                    selectBestFemaleVoice()
                     tts?.setSpeechRate(clampedRate)
                     tts?.setPitch(clampedPitch)
+                    val uttId = "tempest_briefing_${++utteranceSeq}"
+                    activeUtteranceId = uttId
                     val params = Bundle()
-                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "tempest_briefing")
+                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, uttId)
                 } catch (_: Exception) {
+                    activeUtteranceId = null
                     webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
                 }
             }
@@ -51,10 +87,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         @JavascriptInterface
         fun stop() {
             runOnUiThread {
+                activeUtteranceId = null
                 try {
                     tts?.stop()
                 } catch (_: Exception) {}
-                webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
             }
         }
     }
@@ -112,42 +148,18 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             ttsReady = langResult != TextToSpeech.LANG_MISSING_DATA &&
                 langResult != TextToSpeech.LANG_NOT_SUPPORTED
 
-            // Prefer a warm US English female voice when installed on the TV
-            val voices = tts?.voices
-            if (voices != null) {
-                val preferredFemale = listOf("en-us-x-tpf", "en-us-x-sfg", "en-us-x-tpc", "en-us-x-iob", "female")
-                val excludedMale = listOf("iol", "iom", "iog", "male")
-                val bestVoice = voices.firstOrNull { v ->
-                    val n = (v.name ?: "").lowercase(Locale.US)
-                    v.locale?.language == "en" &&
-                        v.locale?.country == "US" &&
-                        preferredFemale.any { p -> n.contains(p) } &&
-                        !v.isNetworkConnectionRequired
-                } ?: voices.firstOrNull { v ->
-                    val n = (v.name ?: "").lowercase(Locale.US)
-                    v.locale?.language == "en" &&
-                        v.locale?.country == "US" &&
-                        preferredFemale.any { p -> n.contains(p) }
-                } ?: voices.firstOrNull { v ->
-                    val n = (v.name ?: "").lowercase(Locale.US)
-                    v.locale?.language == "en" &&
-                        v.locale?.country == "US" &&
-                        !v.isNetworkConnectionRequired &&
-                        excludedMale.none { m -> n.contains(m) }
-                }
-                if (bestVoice != null) {
-                    tts?.voice = bestVoice
-                }
-            }
+            selectBestFemaleVoice()
 
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
+                    if (utteranceId != activeUtteranceId) return
                     runOnUiThread {
                         webView.evaluateJavascript("window.__onNativeTtsStart && window.__onNativeTtsStart()", null)
                     }
                 }
 
                 override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {
+                    if (utteranceId != activeUtteranceId) return
                     runOnUiThread {
                         webView.evaluateJavascript(
                             "window.__onNativeTtsRange && window.__onNativeTtsRange($start, $end)",
@@ -157,6 +169,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 }
 
                 override fun onDone(utteranceId: String?) {
+                    if (utteranceId != activeUtteranceId) return
+                    activeUtteranceId = null
                     runOnUiThread {
                         webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
                     }
@@ -164,12 +178,16 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
+                    if (utteranceId != activeUtteranceId) return
+                    activeUtteranceId = null
                     runOnUiThread {
                         webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
                     }
                 }
 
                 override fun onError(utteranceId: String?, errorCode: Int) {
+                    if (utteranceId != activeUtteranceId) return
+                    activeUtteranceId = null
                     runOnUiThread {
                         webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
                     }

@@ -18,7 +18,7 @@ import {
   degreesToCardinal,
   buildWeathermanBriefingFromDashboard,
 } from './tempest-client.js';
-import { WeatherAvatarController } from './avatar.js';
+import { WeatherAvatarController, buildIndieForecastFromDashboard } from './avatar.js';
 
 const STORAGE_KEYS = {
   stationId: 'tempest_station_id',
@@ -170,6 +170,7 @@ const avatarController = new WeatherAvatarController({
   statusPillEl: els.avatarStatusPill,
   statusTextEl: els.avatarStatusText,
   btnToggleSpeak: els.avatarToggleSpeak,
+  onAutoClose: () => closeAvatarBriefing(),
   autoplayStorageKey: 'tempest_avatar_autoplay',
 });
 
@@ -896,7 +897,7 @@ function syncAvatarModalVisual() {
     els.avatarAutoplayToggle.checked = avatarController.isAutoPlayEnabled();
   }
   avatarController.updateVisual({
-    text: lastBriefingText || els.weathermanText?.textContent || '',
+    text: buildIndieForecastFromDashboard(d, lastBriefingText || els.weathermanText?.textContent || ''),
     iconCode: cur.icon || 'partly-cloudy-day',
     tempText: tempNum,
     condText: cur.conditions || 'Clear',

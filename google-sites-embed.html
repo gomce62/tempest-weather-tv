@@ -451,9 +451,9 @@
         <span>TODAY'S FORECAST</span>
       </div>
       <p id="weatherman-text" class="briefing-text">Loading today's forecast briefing...</p>
-      <button id="btn-watch-briefing" class="briefing-play-btn" type="button" aria-label="Watch Indie weather briefing">
+      <button id="btn-watch-briefing" class="briefing-play-btn" type="button" aria-label="Hear Today's Forecast">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"></polygon></svg>
-        <span>Watch Indie</span>
+        <span>Hear Today's Forecast</span>
       </button>
     </section>
 
@@ -1950,6 +1950,101 @@
       return w;
     }
 
+    function skyDesc(cond, isNight) {
+      const c = String(cond || '').toLowerCase();
+      if (c.includes('thunder')) return 'thunderstorms and gusty skies';
+      if (c.includes('snow') || c.includes('sleet') || c.includes('wintry')) return 'wintry showers';
+      if (c.includes('rain') || c.includes('shower')) return c.includes('possible') || c.includes('light') ? 'scattered light showers' : 'steady rain';
+      if (c.includes('fog')) return 'coastal fog and marine layer clouds';
+      if (c.includes('partly')) return isNight ? 'partly cloudy skies' : 'a mix of sunshine and coastal clouds';
+      if (c.includes('cloud')) return 'mostly cloudy skies';
+      if (c.includes('wind')) return 'breezy skies';
+      if (c.includes('clear') || c.includes('sun')) return isNight ? 'clear, starry skies' : 'bright, sunny skies';
+      return c ? `${c} conditions` : 'fair skies';
+    }
+
+    function summarizeWindow(hours) {
+      if (!hours || !hours.length) return null;
+      const temps = hours.map((h) => h.tmp ?? h.air_temperature).filter((v) => typeof v === 'number');
+      const pops = hours.map((h) => h.p ?? h.precip_probability ?? 0).filter((v) => typeof v === 'number');
+      const winds = hours.map((h) => h.w ?? h.wind_avg).filter((v) => typeof v === 'number');
+      const mid = hours[Math.floor(hours.length / 2)] || hours[0];
+      return {
+        avgTemp: temps.length ? Math.round(temps.reduce((a, b) => a + b, 0) / temps.length) : null,
+        maxTemp: temps.length ? Math.round(Math.max(...temps)) : null,
+        minTemp: temps.length ? Math.round(Math.min(...temps)) : null,
+        maxPop: pops.length ? Math.round(Math.max(...pops)) : 0,
+        maxWind: winds.length ? Math.round(Math.max(...winds)) : null,
+        cond: mid.c ?? mid.conditions ?? mid.i ?? mid.icon ?? '',
+      };
+    }
+
+    function buildIndieForecastFromDashboard(data, fallbackText) {
+      const intro = "Hi, I'm Indie, your Morro Bay Alta Court weather girl. Today's forecast calls for ";
+      if (!data || !data.current) return formatIndieForecastScript(fallbackText);
+      const cur = data.current || {}, daily = Array.isArray(data.daily) ? data.daily : [], hourly = Array.isArray(data.hourly) ? data.hourly : [];
+      const tz = data.station && data.station.timezone, isM = data.units === 'metric', tu = isM ? '°C' : '°F', wu = isM ? 'km/h' : 'mph';
+      const today = daily[0] || null, tomorrow = daily[1] || null;
+      const nowSec = Math.floor(Date.now() / 1000), nowHr = getStationHour(tz);
+      const todayKey = getLocalDateKey(nowSec, tz), tomorrowKey = getLocalDateKey(nowSec + 86400, tz);
+      const hrOf = (ep) => {
+        try { const h = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: tz || undefined }).format(new Date(ep * 1000))); return Number.isNaN(h) ? new Date(ep * 1000).getHours() : h % 24; }
+        catch { return new Date(ep * 1000).getHours(); }
+      };
+      const todayHours = hourly.filter((h) => typeof (h.t ?? h.time) === 'number' && getLocalDateKey(h.t ?? h.time, tz) === todayKey);
+      const overnightHours = hourly.filter((h) => {
+        const t = h.t ?? h.time; if (typeof t !== 'number') return false;
+        const k = getLocalDateKey(t, tz), hr = hrOf(t);
+        return (k === todayKey && hr >= 22) || (k === tomorrowKey && hr < 6);
+      });
+      const midAft = summarizeWindow(todayHours.filter((h) => { const hr = hrOf(h.t ?? h.time); return hr >= 13 && hr <= 16; }));
+      const evening = summarizeWindow(todayHours.filter((h) => { const hr = hrOf(h.t ?? h.time); return hr >= 17 && hr <= 21; }));
+      const overnight = summarizeWindow(overnightHours);
+
+      const curTemp = typeof cur.temperature === 'number' ? Math.round(cur.temperature) : null;
+      const curCond = cur.conditions || (today && today.conditions) || 'Fair';
+      const curSky = skyDesc(curCond, nowHr >= 18 || nowHr < 6);
+      const curWind = typeof cur.windSpeed === 'number' ? Math.round(cur.windSpeed) : null;
+      const curDir = cur.windCardinal || '';
+
+      const parts = [`${curSky}.`];
+      if (curTemp !== null) {
+        const wb = curWind !== null && curWind >= 2 ? ` with ${curDir ? `${curDir} ` : ''}winds around ${curWind} ${wu}` : ' with calm winds';
+        parts.push(`It is currently ${curTemp}${tu} and ${String(curCond).toLowerCase()}${wb}.`);
+      }
+      const todayHi = today && typeof today.high === 'number' ? Math.round(today.high) : typeof cur.todayHigh === 'number' ? Math.round(cur.todayHigh) : null;
+      const todayPop = today && typeof today.precipProbability === 'number' ? Math.round(today.precipProbability) : 0;
+      if (nowHr < 16) {
+        const aftTemp = (midAft && midAft.maxTemp !== null) ? midAft.maxTemp : todayHi;
+        const aftSky = skyDesc((midAft && midAft.cond) || (today && today.conditions) || curCond, false);
+        const aftPop = Math.max((midAft && midAft.maxPop) || 0, todayPop);
+        const popTxt = aftPop >= 25 ? ` and a ${aftPop}% chance of rain` : '';
+        const windTxt = midAft && typeof midAft.maxWind === 'number' && midAft.maxWind >= 4 ? ` with a breeze near ${midAft.maxWind} ${wu}` : '';
+        const uvTxt = typeof cur.uv === 'number' && cur.uv >= 6 ? ' Keep sunglasses and SPF handy for high UV.' : '';
+        parts.push(`You can expect ${aftSky} for mid-afternoon${aftTemp !== null ? ` with temperatures climbing near ${aftTemp}${tu}` : ''}${windTxt}${popTxt}.${uvTxt}`);
+      }
+      if (nowHr < 21) {
+        const eveTemp = evening && evening.avgTemp;
+        const eveSky = skyDesc((evening && evening.cond) || (today && today.conditions) || curCond, true);
+        const evePop = (evening && evening.maxPop) || 0;
+        const eveRain = evePop >= 25 ? ` with a ${evePop}% chance of passing showers` : '';
+        parts.push(`Moving into the evening, expect ${eveSky}${eveTemp !== null ? ` as temperatures cool toward ${eveTemp}${tu}` : ''}${eveRain},`);
+      }
+      const todayLo = today && typeof today.low === 'number' ? Math.round(today.low) : typeof cur.todayLow === 'number' ? Math.round(cur.todayLow) : null;
+      const nightLo = (overnight && overnight.minTemp !== null) ? overnight.minTemp : todayLo;
+      const nightSky = skyDesc((overnight && overnight.cond) || (today && today.conditions) || curCond, true);
+      const nightPop = (overnight && overnight.maxPop) || 0;
+      const nightRain = nightPop >= 30 ? ` and a ${nightPop}% chance of showers` : '';
+      if (nowHr < 21) parts.push(`with overnight calling for ${nightSky}${nightLo !== null ? ` and a low dipping near ${nightLo}${tu}` : ''}${nightRain}.`);
+      else parts.push(`Overnight calls for ${nightSky}${nightLo !== null ? ` with temperatures settling near ${nightLo}${tu}` : ''}${nightRain}.`);
+      if (tomorrow && typeof tomorrow.high === 'number') {
+        const tomSky = skyDesc(tomorrow.conditions, false);
+        const tomPop = typeof tomorrow.precipProbability === 'number' ? Math.round(tomorrow.precipProbability) : 0;
+        parts.push(`Looking ahead, tomorrow brings ${tomSky}${tomPop >= 35 ? ` (${tomPop}% chance of rain)` : ''} with a high near ${Math.round(tomorrow.high)}${tu}.`);
+      }
+      return `${intro}${parts.join(' ')}`;
+    }
+
     function formatIndieForecastScript(rawText) {
       const clean = String(rawText || '').trim().replace(/\s+/g, ' ');
       const intro = "Hi, I'm Indie, your Morro Bay Alta Court weather girl. Today's forecast calls for ";
@@ -1984,12 +2079,11 @@
 
     function getSkyPalette(iconCode) {
       const c = String(iconCode || '').toLowerCase();
-      if (c.includes('thunder')) return { top: '#181e30', mid: '#2b344d', bot: '#3e4761', accent: '#fbbf24', mode: 'storm' };
-      if (c.includes('rain') || c.includes('sleet') || c.includes('snow')) return { top: '#1a2a3a', mid: '#2c4459', bot: '#44627a', accent: '#38bdf8', mode: 'rain' };
-      if (c.includes('night')) return { top: '#0c1428', mid: '#172544', bot: '#243a61', accent: '#7dd3fc', mode: 'night' };
-      if (c.includes('cloudy') && !c.includes('partly')) return { top: '#243447', mid: '#3a4f66', bot: '#566d85', accent: '#93c5fd', mode: 'cloudy' };
-      if (c.includes('partly')) return { top: '#1d4b7a', mid: '#3772a3', bot: '#d48d59', accent: '#f5a623', mode: 'partly' };
-      return { top: '#1c538a', mid: '#3b82bd', bot: '#e39a5d', accent: '#fbbf24', mode: 'sunny' };
+      if (c.includes('thunder')) return { top: '#24293d', mid: '#484863', bot: '#9e6e58', sun: '#fbbf24', sea: '#28364d', mode: 'storm' };
+      if (c.includes('rain') || c.includes('sleet') || c.includes('snow')) return { top: '#283e52', mid: '#4e6b80', bot: '#99887a', sun: '#7dd3fc', sea: '#2d495e', mode: 'rain' };
+      if (c.includes('night')) return { top: '#0e172e', mid: '#1f3359', bot: '#3c4c70', sun: '#bae6fd', sea: '#142642', mode: 'night' };
+      if (c.includes('cloudy') && !c.includes('partly')) return { top: '#3c536b', mid: '#6e8399', bot: '#d49d79', sun: '#fde68a', sea: '#3a556e', mode: 'cloudy' };
+      return { top: '#5a7090', mid: '#d18e5a', bot: '#f7c87e', sun: '#fff3c4', sea: '#576f82', mode: 'sunset' };
     }
 
     function renderAvatarSvg(iconCode, tempText, condText) {
@@ -1997,65 +2091,67 @@
       const weatherIcon = getWeatherIconSvg(iconCode, 34);
       let skyFx = '';
       if (sky.mode === 'night') {
-        skyFx = '<circle cx="42" cy="36" r="1.4" fill="#e2e8f0" opacity="0.85"/><circle cx="76" cy="24" r="1.1" fill="#e2e8f0" opacity="0.7"/><circle cx="115" cy="42" r="1.3" fill="#bae6fd" opacity="0.8"/><circle cx="60" cy="64" r="1" fill="#e2e8f0" opacity="0.6"/><path d="M46 46 A14 14 0 1 0 60 60 A11 11 0 1 1 46 46 Z" fill="#bae6fd" opacity="0.55"/>';
+        skyFx = '<circle cx="38" cy="34" r="1.4" fill="#e2e8f0" opacity="0.85"/><circle cx="72" cy="22" r="1.1" fill="#e2e8f0" opacity="0.7"/><circle cx="114" cy="38" r="1.3" fill="#bae6fd" opacity="0.8"/><path d="M52 52 A14 14 0 1 0 66 66 A11 11 0 1 1 52 52 Z" fill="#bae6fd" opacity="0.65"/>';
       } else if (sky.mode === 'rain' || sky.mode === 'storm') {
-        skyFx = '<g stroke="#7dd3fc" stroke-width="1.5" stroke-linecap="round" opacity="0.35"><line x1="34" y1="26" x2="26" y2="48"/><line x1="68" y1="18" x2="60" y2="40"/><line x1="94" y1="44" x2="86" y2="66"/><line x1="234" y1="92" x2="226" y2="114"/><line x1="256" y1="120" x2="248" y2="142"/></g>';
+        skyFx = '<g stroke="#bae6fd" stroke-width="1.5" stroke-linecap="round" opacity="0.35"><line x1="34" y1="26" x2="26" y2="48"/><line x1="68" y1="18" x2="60" y2="40"/><line x1="94" y1="44" x2="86" y2="66"/><line x1="234" y1="92" x2="226" y2="114"/></g>';
       } else {
-        skyFx = `<circle cx="48" cy="48" r="36" fill="${sky.accent}" opacity="0.16"/><circle cx="48" cy="48" r="18" fill="${sky.accent}" opacity="0.28"/>`;
+        skyFx = `<circle cx="64" cy="110" r="46" fill="#ffd990" opacity="0.32"/><circle cx="64" cy="110" r="24" fill="${sky.sun}" opacity="0.72"/><ellipse cx="64" cy="164" rx="22" ry="4" fill="#ffe5a3" opacity="0.55"/>`;
       }
       return `
-        <svg class="avatar-svg" viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Animated weathercaster avatar Indie">
+        <svg class="avatar-svg" viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Animated beach weathercaster avatar Indie">
           <defs>
-            <linearGradient id="avSkyGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${sky.top}"/><stop offset="58%" stop-color="${sky.mid}"/><stop offset="100%" stop-color="${sky.bot}"/></linearGradient>
-            <radialGradient id="avStudioGlow" cx="50%" cy="42%" r="60%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.14"/><stop offset="100%" stop-color="#0b0e14" stop-opacity="0.28"/></radialGradient>
-            <linearGradient id="avHairBack" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0%" stop-color="#d4984c"/><stop offset="52%" stop-color="#9c6427"/><stop offset="100%" stop-color="#6e4115"/></linearGradient>
-            <linearGradient id="avHairFront" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0%" stop-color="#f2c472"/><stop offset="45%" stop-color="#cf9042"/><stop offset="100%" stop-color="#965d22"/></linearGradient>
-            <linearGradient id="avSkin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f7cab0"/><stop offset="65%" stop-color="#eab28f"/><stop offset="100%" stop-color="#dc9c76"/></linearGradient>
-            <linearGradient id="avNeckShadow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#b8744e" stop-opacity="0.58"/><stop offset="55%" stop-color="#e5a985" stop-opacity="0"/></linearGradient>
-            <linearGradient id="avBlazer" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0%" stop-color="#27466e"/><stop offset="100%" stop-color="#14263f"/></linearGradient>
-            <linearGradient id="avBlouse" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#dce4ee"/></linearGradient>
+            <linearGradient id="avBeachSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${sky.top}"/><stop offset="52%" stop-color="${sky.mid}"/><stop offset="100%" stop-color="${sky.bot}"/></linearGradient>
+            <linearGradient id="avOcean" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${sky.sea}"/><stop offset="100%" stop-color="#2c4152"/></linearGradient>
+            <linearGradient id="avSand" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c99c72"/><stop offset="100%" stop-color="#8a6445"/></linearGradient>
+            <linearGradient id="avHairBack" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0%" stop-color="#d89e4e"/><stop offset="48%" stop-color="#a86d2a"/><stop offset="100%" stop-color="#704316"/></linearGradient>
+            <linearGradient id="avHairFront" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0%" stop-color="#f6cc7b"/><stop offset="45%" stop-color="#d59444"/><stop offset="100%" stop-color="#965d22"/></linearGradient>
+            <linearGradient id="avSkinTan" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f2ba96"/><stop offset="58%" stop-color="#e19e76"/><stop offset="100%" stop-color="#cf865e"/></linearGradient>
+            <linearGradient id="avNeckShadow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a6603b" stop-opacity="0.52"/><stop offset="58%" stop-color="#de9b73" stop-opacity="0"/></linearGradient>
+            <linearGradient id="avBikiniWhite" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#e7ecf2"/></linearGradient>
           </defs>
-          <rect width="280" height="280" fill="url(#avSkyGrad)"/><rect width="280" height="280" fill="url(#avStudioGlow)"/>${skyFx}
-          <path d="M0 228 Q70 214 140 224 T280 220 L280 280 L0 280 Z" fill="#0f172a" opacity="0.35"/>
+          <rect width="280" height="162" fill="url(#avBeachSky)"/>${skyFx}
+          <rect x="0" y="158" width="280" height="58" fill="url(#avOcean)"/>
+          <path d="M0 184 Q45 178 90 184 T180 182 T280 185" stroke="#f8fafc" stroke-width="2" fill="none" opacity="0.45"/>
+          <path d="M0 202 Q65 196 130 203 T280 200" stroke="#fde68a" stroke-width="1.6" fill="none" opacity="0.3"/>
+          <path d="M0 212 Q120 202 280 218 L280 280 L0 280 Z" fill="url(#avSand)"/>
           <g transform="translate(184, 14)">
-            <rect x="0" y="0" width="84" height="68" rx="10" fill="rgba(14, 18, 26, 0.72)" stroke="rgba(96, 174, 255, 0.45)" stroke-width="1.2"/>
+            <rect x="0" y="0" width="84" height="68" rx="10" fill="rgba(14, 18, 26, 0.68)" stroke="rgba(246, 204, 123, 0.55)" stroke-width="1.2"/>
             <g transform="translate(8, 7)">${weatherIcon}</g>
             <text x="47" y="30" fill="#f8fafc" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="600">${tempText}</text>
-            <text x="42" y="56" text-anchor="middle" fill="#a4b8cf" font-family="Inter, system-ui, sans-serif" font-size="8.5" font-weight="500">${String(condText || '').slice(0, 14)}</text>
+            <text x="42" y="56" text-anchor="middle" fill="#e5d7be" font-family="Inter, system-ui, sans-serif" font-size="8.5" font-weight="500">${String(condText || '').slice(0, 14)}</text>
           </g>
-          <path d="M78 106 C66 138, 60 185, 65 232 C76 244, 96 246, 108 238 L172 238 C184 246, 204 244, 215 232 C220 185, 214 138, 202 106 C194 64, 170 42, 140 42 C110 42, 86 64, 78 106 Z" fill="url(#avHairBack)"/>
+          <path d="M76 96 C58 134, 46 184, 54 236 C68 248, 92 246, 108 232 L176 232 C192 246, 218 244, 232 228 C236 182, 222 130, 206 96 C195 58, 170 40, 140 40 C108 40, 86 58, 76 96 Z" fill="url(#avHairBack)"/>
           <g class="av-torso">
-            <path d="M122 162 L122 204 Q140 215 158 204 L158 162 Z" fill="url(#avSkin)"/>
-            <path d="M122 162 L122 192 Q140 198 158 192 L158 162 Z" fill="url(#avNeckShadow)"/>
-            <path d="M98 206 Q140 195 182 206 L192 280 L88 280 Z" fill="url(#avBlouse)"/>
-            <path d="M116 208 Q128 214 136 212 M164 208 Q152 214 144 212" stroke="#d99a74" stroke-width="1.3" stroke-linecap="round" fill="none" opacity="0.65"/>
-            <path d="M121 200 Q140 225 159 200" stroke="#e5b869" stroke-width="1.4" fill="none"/>
-            <circle cx="140" cy="215" r="2.6" fill="#f3cd7a" stroke="#b98936" stroke-width="0.6"/>
-            <path d="M52 280 C55 242, 68 214, 98 203 L122 197 L137 265 L140 280 L52 280 Z" fill="url(#avBlazer)"/>
-            <path d="M228 280 C225 242, 212 214, 182 203 L158 197 L143 265 L140 280 L228 280 Z" fill="url(#avBlazer)"/>
-            <polygon points="122,197 104,218 118,225 110,242 138,266" fill="#1b3557" stroke="#315785" stroke-width="0.9"/>
-            <polygon points="158,197 176,218 162,225 170,242 142,266" fill="#1b3557" stroke="#315785" stroke-width="0.9"/>
-            <rect x="163" y="232" width="4.5" height="8" rx="2" fill="#0f172a" stroke="#64748b" stroke-width="0.7"/>
-            <circle cx="165.2" cy="234" r="1.4" fill="#60aeff"/>
+            <path d="M58 280 C62 244, 72 214, 98 202 C112 195, 168 195, 182 202 C208 214, 218 244, 222 280 Z" fill="url(#avSkinTan)"/>
+            <ellipse cx="86" cy="218" rx="14" ry="7" fill="#ffd9b8" opacity="0.32" transform="rotate(-18 86 218)"/>
+            <ellipse cx="194" cy="218" rx="14" ry="7" fill="#ffd9b8" opacity="0.28" transform="rotate(18 194 218)"/>
+            <path d="M123 158 L123 200 Q140 212 157 200 L157 158 Z" fill="url(#avSkinTan)"/>
+            <path d="M123 158 L123 189 Q140 195 157 189 L157 158 Z" fill="url(#avNeckShadow)"/>
+            <path d="M107 205 Q124 214 136 210 M173 205 Q156 214 144 210" stroke="#b9724e" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.5"/>
+            <path d="M128 240 Q140 256 152 240" stroke="#b86e48" stroke-width="1.2" fill="none" opacity="0.45"/>
+            <path d="M124 198 L106 244 M156 198 L174 244" stroke="#d4a656" stroke-width="3.2" stroke-linecap="round"/>
+            <path d="M96 276 C96 250, 108 232, 122 232 C133 232, 139 248, 139 272 C125 278, 108 279, 96 276 Z" fill="url(#avBikiniWhite)" stroke="#cfa04f" stroke-width="2.2"/>
+            <path d="M184 276 C184 250, 172 232, 158 232 C147 232, 141 248, 141 272 C155 278, 172 279, 184 276 Z" fill="url(#avBikiniWhite)" stroke="#cfa04f" stroke-width="2.2"/>
+            <circle cx="140" cy="271" r="3" fill="#e0b463" stroke="#9e742b" stroke-width="0.8"/>
+            <path d="M138 273 Q133 279 136 280 M142 273 Q147 279 144 280" stroke="#d4a656" stroke-width="1.4" fill="none"/>
           </g>
           <g class="av-head">
-            <ellipse cx="94" cy="126" rx="6.5" ry="11" fill="#e5a884"/><ellipse cx="186" cy="126" rx="6.5" ry="11" fill="#e5a884"/>
-            <circle cx="93.5" cy="133.5" r="2.3" fill="#f3cd7a"/><circle cx="186.5" cy="133.5" r="2.3" fill="#f3cd7a"/>
-            <path d="M96 105 C95 142, 111 174, 140 177 C169 174, 185 142, 184 105 C184 73, 166 56, 140 56 C114 56, 96 73, 96 105 Z" fill="url(#avSkin)"/>
-            <ellipse cx="111" cy="135" rx="11" ry="6" fill="#e37c68" opacity="0.24"/><ellipse cx="169" cy="135" rx="11" ry="6" fill="#e37c68" opacity="0.24"/>
-            <path d="M115 141 Q112 148 117 154" stroke="#c88563" stroke-width="1" fill="none" opacity="0.35"/><path d="M165 141 Q168 148 163 154" stroke="#c88563" stroke-width="1" fill="none" opacity="0.35"/>
-            <path d="M139 112 L136.5 129 Q140 134 144.5 130" stroke="#c5825d" stroke-width="1.6" stroke-linecap="round" fill="none"/>
-            <path d="M136 131 Q140 134 144 131" stroke="#b9724e" stroke-width="1" fill="none" opacity="0.55"/>
-            <g class="av-brows"><path d="M107 103 Q119 97 131 102" stroke="#855628" stroke-width="2.7" stroke-linecap="round" fill="none"/><path d="M149 102 Q161 97 173 103" stroke="#855628" stroke-width="2.7" stroke-linecap="round" fill="none"/></g>
+            <ellipse cx="94" cy="126" rx="6.5" ry="11" fill="#df9e77"/><ellipse cx="186" cy="126" rx="6.5" ry="11" fill="#df9e77"/>
+            <path d="M96 105 C95 142, 111 174, 140 177 C169 174, 185 142, 184 105 C184 73, 166 56, 140 56 C114 56, 96 73, 96 105 Z" fill="url(#avSkinTan)"/>
+            <ellipse cx="111" cy="135" rx="12" ry="6.5" fill="#df725c" opacity="0.24"/><ellipse cx="169" cy="135" rx="12" ry="6.5" fill="#df725c" opacity="0.24"/>
+            <path d="M115 141 Q112 148 117 154" stroke="#b97552" stroke-width="1" fill="none" opacity="0.35"/><path d="M165 141 Q168 148 163 154" stroke="#b97552" stroke-width="1" fill="none" opacity="0.35"/>
+            <path d="M139 112 L136.5 129 Q140 134 144.5 130" stroke="#b9744f" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+            <path d="M136 131 Q140 134 144 131" stroke="#ad6541" stroke-width="1" fill="none" opacity="0.55"/>
+            <g class="av-brows"><path d="M107 103 Q119 97 131 102" stroke="#805124" stroke-width="2.6" stroke-linecap="round" fill="none"/><path d="M149 102 Q161 97 173 103" stroke="#805124" stroke-width="2.6" stroke-linecap="round" fill="none"/></g>
             <g class="av-eyes">
               <path d="M108 115 Q120 107 131 115 Q120 122 108 115 Z" fill="#ffffff"/>
-              <circle cx="119.5" cy="114.8" r="5.2" fill="#2c6eb5"/><circle cx="119.5" cy="114.8" r="3.4" fill="#4e9ae8"/><circle cx="119.5" cy="114.8" r="2.2" fill="#0f172a"/><circle cx="121.2" cy="113.1" r="1.3" fill="#ffffff"/>
+              <circle cx="119.5" cy="114.8" r="5.2" fill="#2a6cb3"/><circle cx="119.5" cy="114.8" r="3.4" fill="#4f9be8"/><circle cx="119.5" cy="114.8" r="2.2" fill="#0f172a"/><circle cx="121.2" cy="113.1" r="1.3" fill="#ffffff"/>
               <path d="M107.5 115 Q120 106.5 131.5 115" stroke="#362214" stroke-width="2.1" stroke-linecap="round" fill="none"/>
               <path d="M149 115 Q160 107 172 115 Q160 122 149 115 Z" fill="#ffffff"/>
-              <circle cx="160.5" cy="114.8" r="5.2" fill="#2c6eb5"/><circle cx="160.5" cy="114.8" r="3.4" fill="#4e9ae8"/><circle cx="160.5" cy="114.8" r="2.2" fill="#0f172a"/><circle cx="162.2" cy="113.1" r="1.3" fill="#ffffff"/>
+              <circle cx="160.5" cy="114.8" r="5.2" fill="#2a6cb3"/><circle cx="160.5" cy="114.8" r="3.4" fill="#4f9be8"/><circle cx="160.5" cy="114.8" r="2.2" fill="#0f172a"/><circle cx="162.2" cy="113.1" r="1.3" fill="#ffffff"/>
               <path d="M148.5 115 Q160 106.5 172.5 115" stroke="#362214" stroke-width="2.1" stroke-linecap="round" fill="none"/>
             </g>
-            <g class="av-eyelids"><path d="M107 115 Q120 106 132 115 Q120 123 107 115 Z" fill="#e8af8c"/><path d="M148 115 Q160 106 173 115 Q160 123 148 115 Z" fill="#e8af8c"/></g>
+            <g class="av-eyelids"><path d="M107 115 Q120 106 132 115 Q120 123 107 115 Z" fill="#e19e76"/><path d="M148 115 Q160 106 173 115 Q160 123 148 115 Z" fill="#e19e76"/></g>
             <g class="av-mouth-wrap">
               <g class="av-mouth av-mouth-rest"><path d="M123 149 Q140 160 157 149 Q140 153 123 149 Z" fill="#ffffff"/><path d="M122 149 Q140 154 158 149" stroke="#ba5e5a" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M124 150 Q140 163 156 150" stroke="#c86b66" stroke-width="2.3" stroke-linecap="round" fill="none"/></g>
               <g class="av-mouth av-mouth-small"><path d="M124 149 Q140 146 156 149 Q140 160 124 149 Z" fill="#5e2124"/><path d="M127 149 Q140 148 153 149 L151 152 Q140 153 129 152 Z" fill="#ffffff"/><path d="M124 149 Q140 146 156 149 Q140 161 124 149 Z" stroke="#c0615d" stroke-width="2" fill="none"/></g>
@@ -2063,26 +2159,63 @@
               <g class="av-mouth av-mouth-wide"><path d="M124 147 Q140 143 156 147 Q155 168 140 168 Q125 168 124 147 Z" fill="#4f171a"/><path d="M127 147 Q140 145 153 147 L151 152 Q140 153 129 152 Z" fill="#ffffff"/><ellipse cx="140" cy="162.5" rx="9" ry="4" fill="#ce7072"/><path d="M124 147 Q140 143 156 147 Q155 168 140 168 Q125 168 124 147 Z" stroke="#c0615d" stroke-width="2.1" fill="none"/></g>
               <g class="av-mouth av-mouth-round"><ellipse cx="140" cy="155" rx="8.5" ry="7.8" fill="#561b1e" stroke="#c0615d" stroke-width="2.4"/><ellipse cx="140" cy="159.5" rx="4.5" ry="2.2" fill="#c96b6d"/></g>
             </g>
-            <path d="M126 48 C102 49, 82 69, 77 104 C72 135, 76 172, 86 206 C92 184, 93 150, 96 122 C99 95, 110 75, 128 65 Z" fill="url(#avHairFront)"/>
-            <path d="M125 48 C154 44, 188 64, 198 102 C207 136, 203 176, 193 209 C187 184, 187 150, 183 122 C179 92, 160 72, 126 65 Z" fill="url(#avHairFront)"/>
-            <path d="M125 48 C116 62, 102 78, 92 92 C98 71, 110 53, 125 48 Z" fill="#e9b764" opacity="0.72"/>
-            <path d="M126 49 C145 55, 166 72, 179 94 C168 68, 149 52, 126 49 Z" fill="#f3ca7d" opacity="0.65"/>
-            <path d="M108 64 Q89 96 86 148" stroke="#fbe3a4" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.48"/>
-            <path d="M158 58 Q186 88 192 146" stroke="#fbe3a4" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.48"/>
-            <path d="M170 72 Q194 114 190 176" stroke="#f5d186" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.38"/>
+            <path d="M129 46 C103 47, 81 66, 74 103 C67 136, 71 178, 82 222 C92 198, 92 162, 95 124 C98 94, 111 72, 130 62 Z" fill="url(#avHairFront)"/>
+            <path d="M128 46 C158 43, 191 63, 202 103 C213 140, 211 184, 198 228 C189 200, 189 158, 184 124 C179 92, 161 70, 129 62 Z" fill="url(#avHairFront)"/>
+            <path d="M128 46 C116 61, 102 77, 90 93 C97 70, 111 51, 128 46 Z" fill="#f3c774" opacity="0.78"/>
+            <path d="M129 48 C149 54, 169 72, 182 95 C170 67, 151 51, 129 48 Z" fill="#f9d891" opacity="0.7"/>
+            <path d="M105 63 Q84 96 76 158 Q74 192 84 218" stroke="#ffeab3" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.58"/>
+            <path d="M161 58 Q190 90 198 156 Q200 186 192 214" stroke="#ffeab3" stroke-width="2.1" stroke-linecap="round" fill="none" opacity="0.55"/>
+            <path d="M77 116 Q60 154 64 198" stroke="#f7d58b" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.45"/>
+            <path d="M198 116 Q216 154 212 198" stroke="#f7d58b" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.45"/>
           </g>
         </svg>`;
     }
 
     const avatarCtrl = {
       speaking: false,
+      manualStop: false,
       scriptData: { displayWords: [], spokenText: '', wordBounds: [] },
       activeWordIdx: -1,
       cadenceTimer: null,
+      autoCloseTimer: null,
       mouthIdx: 0,
       autoPlayedOnce: false,
       isAutoPlayEnabled() { return safeStore.get('tempest_gs_avatar_autoplay', 'false') === 'true'; },
       setAutoPlayEnabled(val) { safeStore.set('tempest_gs_avatar_autoplay', val ? 'true' : 'false'); },
+      pickBrowserVoice() {
+        if (!('speechSynthesis' in window)) return null;
+        const voices = window.speechSynthesis.getVoices() || [];
+        if (!voices.length) return null;
+        const malePat = /\b(male|david|mark|guy|daniel|alex|fred|aaron|arthur|ryan|andrew|brian|christopher|eric|steffan|george|james|richard|rishi|oliver|thomas|albert|bruce|ralph)\b/i;
+        const pref = ['microsoft aria', 'microsoft jenny', 'microsoft ava', 'microsoft emma', 'google us english', 'samantha', 'ava', 'allison', 'victoria', 'serena', 'karen', 'tessa', 'moira', 'zira', 'female'];
+        for (const p of pref) {
+          const match = voices.find((x) => x.name.toLowerCase().includes(p) && !malePat.test(x.name));
+          if (match) return match;
+        }
+        return voices.find((x) => /^en[-_]US/i.test(x.lang) && !malePat.test(x.name)) || voices.find((x) => /^en/i.test(x.lang) && !malePat.test(x.name)) || null;
+      },
+      waitForFemaleVoice(timeoutMs) {
+        return new Promise((resolve) => {
+          if (!('speechSynthesis' in window)) { resolve(null); return; }
+          const existing = this.pickBrowserVoice();
+          if (existing && (window.speechSynthesis.getVoices() || []).length > 0) { resolve(existing); return; }
+          let done = false;
+          const finish = () => { if (done) return; done = true; clearInterval(pid); clearTimeout(tid); resolve(this.pickBrowserVoice()); };
+          const pid = setInterval(() => { if ((window.speechSynthesis.getVoices() || []).length > 0) finish(); }, 45);
+          const tid = setTimeout(finish, timeoutMs || 700);
+          if (typeof window.speechSynthesis.addEventListener === 'function') window.speechSynthesis.addEventListener('voiceschanged', finish, { once: true });
+        });
+      },
+      scheduleAutoClose() {
+        this.clearAutoClose();
+        this.autoCloseTimer = setTimeout(() => {
+          this.autoCloseTimer = null;
+          if (!this.speaking && !this.manualStop) closeAvatarBriefing();
+        }, 1100);
+      },
+      clearAutoClose() {
+        if (this.autoCloseTimer) { clearTimeout(this.autoCloseTimer); this.autoCloseTimer = null; }
+      },
       setMouth(shape) {
         const svg = els.avatarStage && els.avatarStage.querySelector('.avatar-svg');
         if (svg) svg.setAttribute('data-mouth', shape || 'rest');
@@ -2136,8 +2269,10 @@
         }
         this.setMouth('rest');
       },
-      speak() {
+      async speak() {
         this.stop();
+        this.manualStop = false;
+        this.clearAutoClose();
         const spoken = this.scriptData.spokenText;
         if (!spoken) return;
         if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
@@ -2145,20 +2280,20 @@
           this.setSpeakingState(false);
           return;
         }
+        const v = await this.waitForFemaleVoice(700);
+        if (this.manualStop) return;
         try {
           window.speechSynthesis.cancel();
           const utt = new SpeechSynthesisUtterance(spoken);
           utt.rate = 0.90; utt.pitch = 0.94;
-          const voices = window.speechSynthesis.getVoices() || [];
-          const pref = ['microsoft aria', 'microsoft jenny', 'microsoft ava', 'microsoft emma', 'google us english', 'samantha', 'ava', 'allison', 'victoria', 'serena', 'karen', 'tessa', 'zira', 'female'];
-          let v = null;
-          for (const p of pref) { v = voices.find((x) => x.name.toLowerCase().includes(p)); if (v) break; }
-          const malePat = /\b(male|david|mark|guy|daniel|alex|fred|aaron|arthur|ryan|andrew|brian|christopher|eric|steffan|george|james|richard)\b/i;
-          if (!v) v = voices.find((x) => /^en[-_]US/i.test(x.lang) && !malePat.test(x.name)) || voices.find((x) => /^en/i.test(x.lang) && !malePat.test(x.name)) || voices.find((x) => /^en[-_]US/i.test(x.lang));
-          if (v) utt.voice = v;
+          if (v) { utt.voice = v; utt.lang = v.lang || 'en-US'; } else { utt.lang = 'en-US'; }
           utt.onstart = () => this.setSpeakingState(true);
           utt.onboundary = (e) => { if (typeof e.charIndex === 'number') this.handleBoundary(e.charIndex); };
-          utt.onend = () => this.setSpeakingState(false);
+          utt.onend = () => {
+            const shouldClose = !this.manualStop;
+            this.setSpeakingState(false);
+            if (shouldClose) this.scheduleAutoClose();
+          };
           utt.onerror = () => this.setSpeakingState(false);
           this.setSpeakingState(true);
           window.speechSynthesis.speak(utt);
@@ -2167,10 +2302,21 @@
         }
       },
       stop() {
+        this.manualStop = true;
+        this.clearAutoClose();
         if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch {} }
         this.setSpeakingState(false);
       },
     };
+
+    if ('speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.getVoices();
+        if (typeof window.speechSynthesis.addEventListener === 'function') {
+          window.speechSynthesis.addEventListener('voiceschanged', () => window.speechSynthesis.getVoices());
+        }
+      } catch {}
+    }
 
     (function blinkLoop() {
       setTimeout(() => {
@@ -2186,7 +2332,8 @@
       const tt = typeof cur.temperature === 'number' ? `${Math.round(cur.temperature)}${uc}` : `--${uc}`;
       if (els.avatarModalMeta) els.avatarModalMeta.textContent = `${st.name || 'Alta Ct'} · Station ${st.stationId || state.stationId}`;
       if (els.avatarAutoplayToggle) els.avatarAutoplayToggle.checked = avatarCtrl.isAutoPlayEnabled();
-      avatarCtrl.updateVisual(lastBriefingText || (els.weathermanText && els.weathermanText.textContent) || '', cur.icon || 'partly-cloudy-day', tt, cur.conditions || 'Clear');
+      const fullText = buildIndieForecastFromDashboard(d, lastBriefingText || (els.weathermanText && els.weathermanText.textContent) || '');
+      avatarCtrl.updateVisual(fullText, cur.icon || 'partly-cloudy-day', tt, cur.conditions || 'Clear');
     }
     function openAvatarBriefing(speakNow) {
       if (!els.avatarModal) return;
