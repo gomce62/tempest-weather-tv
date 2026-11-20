@@ -16,6 +16,7 @@ import {
   fetchMorroBayTides,
   TempestWebSocket,
   degreesToCardinal,
+  buildWeathermanBriefingFromDashboard,
 } from './tempest-client.js';
 
 const STORAGE_KEYS = {
@@ -53,6 +54,8 @@ const els = {
   noticeBanner: document.getElementById('notice-banner'),
   noticeText: document.getElementById('notice-text'),
   noticeAction: document.getElementById('notice-action'),
+
+  weathermanText: document.getElementById('weatherman-text'),
 
   tempWhole: document.getElementById('temp-whole'),
   tempUnit: document.getElementById('temp-unit'),
@@ -394,10 +397,13 @@ function renderDashboard(data) {
   els.tempUnit.textContent = isMetric ? '°C' : '°F';
   els.feelsLikeVal.textContent = `${Math.round(cur.feelsLike ?? tempNum)}°`;
 
-  // Hero Condition + Narrative
+  // Hero Condition + Narrative + Weatherman Briefing
   els.heroIcon.innerHTML = getWeatherIconSvg(cur.icon, 54);
   els.conditionTitle.textContent = cur.conditions || 'Clear';
   els.conditionSummary.textContent = cur.summary || '';
+  if (els.weathermanText) {
+    els.weathermanText.textContent = cur.forecastBriefing || buildWeathermanBriefingFromDashboard(data);
+  }
 
   // Daily Low / High Range Bar
   const low = Number(cur.todayLow ?? tempNum - 5);
@@ -485,15 +491,47 @@ function renderDashboard(data) {
   // Morro Bay Tides
   renderTides(data.tides, data.units);
 
-  // Lightning alert (Tempest specialty!)
-  if (!data.isDemo && cur.lightningCount1hr > 0) {
-    const distUnit = isMetric ? 'km' : 'mi';
-    const dist = cur.lightningLastDistance ? ` · ${Math.round(cur.lightningLastDistance)} ${distUnit}` : '';
-    els.lightningVal.textContent = `${cur.lightningCount1hr} in last hr${dist}`;
+  // Lightning / Last Strike (Tempest specialty!)
+  const lightningInfo = formatLightningDisplay(cur, isMetric, station.timezone);
+  if (!data.isDemo && lightningInfo) {
+    const lblEl = els.lightningItem.querySelector('.astro-label');
+    if (lblEl) lblEl.textContent = lightningInfo.label;
+    els.lightningVal.textContent = lightningInfo.text;
     els.lightningItem.classList.remove('hidden');
   } else {
     els.lightningItem.classList.add('hidden');
   }
+}
+
+function formatLightningDisplay(cur, isMetric, timezone) {
+  const count = Number(cur?.lightningCount1hr || 0);
+  const lastEpoch = Number(cur?.lightningLastEpoch || 0);
+  const dist = cur?.lightningLastDistance;
+  const distUnit = isMetric ? 'km' : 'mi';
+  const distStr = typeof dist === 'number' && !Number.isNaN(dist) && dist > 0 ? ` · ${Math.round(dist)} ${distUnit}` : '';
+
+  if (count > 0) {
+    return { label: 'Lightning', text: `${count} in last hr${distStr}` };
+  }
+  if (lastEpoch > 0) {
+    const ageSec = Math.max(0, Math.floor(Date.now() / 1000) - lastEpoch);
+    let whenStr = '';
+    if (ageSec < 3600) {
+      whenStr = `${Math.max(1, Math.round(ageSec / 60))}m ago`;
+    } else if (ageSec < 86400) {
+      whenStr = `${Math.round(ageSec / 3600)}h ago`;
+    } else {
+      try {
+        whenStr = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: timezone }).format(
+          new Date(lastEpoch * 1000)
+        );
+      } catch {
+        whenStr = `${Math.round(ageSec / 86400)}d ago`;
+      }
+    }
+    return { label: 'Last Strike', text: `${whenStr}${distStr}` };
+  }
+  return null;
 }
 
 function renderTides(tides, units) {
@@ -862,13 +900,19 @@ function bindEvents() {
     loadDashboardData({ manual: true });
   });
 
-  els.btnFullscreen.addEventListener('click', () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.().catch(() => {});
+  if (els.btnFullscreen) {
+    if (!document.fullscreenEnabled) {
+      els.btnFullscreen.classList.add('hidden');
     } else {
-      document.exitFullscreen?.().catch(() => {});
+      els.btnFullscreen.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen?.().catch(() => {});
+        } else {
+          document.exitFullscreen?.().catch(() => {});
+        }
+      });
     }
-  });
+  }
 
   els.btnUseDemo.addEventListener('click', () => {
     state.mode = 'demo';

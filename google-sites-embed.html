@@ -126,8 +126,25 @@
 
     .dashboard-main {
       flex: 1; width: 100%; max-width: 1640px; margin: 0 auto;
-      padding: 18px 24px 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px;
+      padding: 16px 24px 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 15px;
     }
+
+    .briefing-card {
+      background: linear-gradient(90deg, rgba(96, 174, 255, 0.09) 0%, rgba(26, 27, 30, 0.96) 45%);
+      border: 1px solid var(--border-subtle);
+      border-left: 3px solid var(--accent-blue);
+      border-radius: 8px;
+      padding: 11px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .briefing-badge {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600;
+      letter-spacing: 0.09em; color: #7cc4ec; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
+    }
+    .briefing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-blue); box-shadow: 0 0 8px rgba(88, 166, 255, 0.75); }
+    .briefing-text { font-size: 14px; line-height: 1.48; color: #e4e8ef; min-width: 0; }
 
     .upper-grid { display: grid; grid-template-columns: minmax(300px, 36.5%) 1fr; gap: 22px; align-items: stretch; }
     .hero-panel { display: flex; flex-direction: column; justify-content: center; padding: 6px 8px 4px 4px; }
@@ -223,12 +240,6 @@
     .tide-height { color: var(--text-secondary); font-size: 12px; }
     .lightning-item { color: #fbbf24; padding-left: 14px; border-left: 1px solid #2e3138; }
 
-    .fullscreen-btn {
-      background: transparent; border: none; color: var(--text-secondary); width: 28px; height: 28px;
-      border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
-    }
-    .fullscreen-btn:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.08); }
-
     .day-detail-card {
       width: 100%; max-width: 980px; background: #161419; border: 1px solid #2f2b36;
       border-radius: 12px; box-shadow: 0 28px 70px rgba(0, 0, 0, 0.75); overflow: hidden; padding: 20px 0 14px;
@@ -305,6 +316,7 @@
       .top-bar { flex-direction: column; align-items: flex-start; padding: 12px 16px; }
       .header-right { width: 100%; justify-content: space-between; }
       .dashboard-main { padding: 14px 16px; }
+      .briefing-card { flex-direction: column; align-items: flex-start; gap: 6px; }
       .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .form-row-inline { grid-template-columns: 1fr; }
     }
@@ -365,7 +377,7 @@
         <button id="btn-settings" class="icon-btn" type="button" title="API Key &amp; Station Settings" aria-label="Settings">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
           </svg>
         </button>
       </div>
@@ -385,6 +397,14 @@
   </div>
 
   <main class="dashboard-main">
+    <section id="weatherman-briefing" class="briefing-card" aria-label="Today's Forecast Summary">
+      <div class="briefing-badge">
+        <span class="briefing-dot" aria-hidden="true"></span>
+        <span>TODAY'S FORECAST</span>
+      </div>
+      <p id="weatherman-text" class="briefing-text">Loading today's forecast briefing...</p>
+    </section>
+
     <section class="upper-grid">
       <div class="hero-panel">
         <div class="temp-hero">
@@ -560,15 +580,6 @@
           <strong id="lightning-val" class="astro-value"></strong>
         </div>
       </div>
-
-      <button id="btn-fullscreen" class="fullscreen-btn" type="button" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 3 21 3 21 9"></polyline>
-          <polyline points="9 21 3 21 3 15"></polyline>
-          <line x1="21" y1="3" x2="14" y2="10"></line>
-          <line x1="3" y1="21" x2="10" y2="14"></line>
-        </svg>
-      </button>
     </footer>
   </main>
 
@@ -750,9 +761,10 @@
       mode: 'tempest_gs_mode',
     };
 
+    const storedProxy = safeStore.get(STORAGE_KEYS.proxyUrl, null);
     const state = {
       stationId: safeStore.get(STORAGE_KEYS.stationId, EMBEDDED_CONFIG.stationId) || '218212',
-      proxyUrl: safeStore.get(STORAGE_KEYS.proxyUrl, '') || EMBEDDED_CONFIG.proxyUrl || '',
+      proxyUrl: storedProxy !== null ? storedProxy : (EMBEDDED_CONFIG.proxyUrl || ''),
       token: safeStore.get(STORAGE_KEYS.token, '') || EMBEDDED_CONFIG.apiToken || '',
       units: safeStore.get(STORAGE_KEYS.units, EMBEDDED_CONFIG.units) || 'imperial',
       mode: safeStore.get(STORAGE_KEYS.mode, 'auto') || 'auto',
@@ -768,6 +780,7 @@
       statusDot: $('status-dot'), statusLabel: $('status-label'), lastUpdated: $('last-updated'),
       clockTime: $('clock-time'), clockAmPm: $('clock-ampm'), clockDate: $('clock-date'),
       noticeBanner: $('notice-banner'), noticeText: $('notice-text'), noticeAction: $('notice-action'),
+      weathermanText: $('weatherman-text'),
       tempWhole: $('temp-whole'), tempUnit: $('temp-unit'), tempDecimal: $('temp-decimal'),
       feelsLikeVal: $('feels-like-val'), heroIcon: $('hero-icon'), conditionTitle: $('condition-title'),
       conditionSummary: $('condition-summary'), todayLowVal: $('today-low-val'), todayHighVal: $('today-high-val'),
@@ -786,7 +799,7 @@
       tidesItem: $('tides-item'), iconTides: $('icon-tides'), tidesVal: $('tides-val'),
       lightningItem: $('lightning-item'), lightningVal: $('lightning-val'),
       btnUnits: $('btn-units'), btnRefresh: $('btn-refresh'), btnSettings: $('btn-settings'),
-      btnFullscreen: $('btn-fullscreen'), modal: $('settings-modal'), modalClose: $('modal-close'),
+      modal: $('settings-modal'), modalClose: $('modal-close'),
       settingsForm: $('settings-form'), inputStationId: $('input-station-id'), inputProxyUrl: $('input-proxy-url'), inputApiToken: $('input-api-token'),
       inputUnits: $('input-units'), inputMode: $('input-mode'), btnUseDemo: $('btn-use-demo'), modalError: $('modal-error'),
       dayDetailModal: $('day-detail-modal'), detailDayTitle: $('detail-day-title'), detailDayCond: $('detail-day-cond'),
@@ -1001,10 +1014,13 @@
           epoch: Math.floor(now.getTime() / 1000) - 15, temperature: T(63.1), feelsLike: T(63),
           conditions: 'Partly Cloudy',
           summary: m ? 'Partly cloudy skies. Low 9°C. Winds SW at 8 to 16 km/h.' : 'Partly cloudy skies. Low 48°F. Winds SW at 5 to 10 mph.',
+          forecastBriefing: m
+            ? 'Good evening! Expect partly cloudy skies tonight as temperatures settle toward an overnight low near 9°C. Dry conditions hold steady with light SW winds at 8 to 16 km/h. Tomorrow looks bright and sunny with a high near 21°C.'
+            : 'Good evening! Expect partly cloudy skies tonight as temperatures settle toward an overnight low near 48°F. Dry conditions hold steady with light SW winds at 5 to 10 mph. Tomorrow looks bright and sunny with a high near 69°F.',
           icon: 'partly-cloudy-night', todayLow: T(48), todayHigh: T(69),
           humidity: 51, dewPoint: T(44.8), windSpeed: W(1.1), windGust: W(3.4), windPeakToday: W(7.4),
           windDirection: 289, windCardinal: 'WNW', pressure: P(30.21), pressureTrend: 'falling',
-          pressureChange3hr: m ? -0.3 : -0.01, precipToday: R(0), precipRate: R(0), precip7Day: R(0),
+          pressureChange3hr: m ? -0.3 : -0.01, precipToday: R(0), precipRate: R(0), precip7Day: R(0.42),
           uv: 0, solarRadiation: 13.4, solarPeakToday: 293, lightningCount1hr: 0, lightningLastDistance: null,
         },
         astronomy: { sunriseEpoch: sr, sunsetEpoch: ss },
@@ -1030,7 +1046,53 @@
       return dirs[Math.round((((Number(deg || 0) % 360) + 360) % 360) / 22.5) % 16];
     }
 
-    function buildSummary(bf, units) {
+    function getStationHour(timezone) {
+      try {
+        const h = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: timezone || undefined }).format(new Date()));
+        return Number.isNaN(h) ? new Date().getHours() : h % 24;
+      } catch { return new Date().getHours(); }
+    }
+    function formatHourBucket(epochSec, timezone) {
+      try { return new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: true, timeZone: timezone || undefined }).format(new Date(epochSec * 1000)); }
+      catch { const h = new Date(epochSec * 1000).getHours(); return `${h % 12 || 12} ${h >= 12 ? 'PM' : 'AM'}`; }
+    }
+    function getLocalDateKey(epochSec, timezone) {
+      try { return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: timezone || undefined }).format(new Date(epochSec * 1000)); }
+      catch { const d = new Date(epochSec * 1000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+    }
+    function getLocalMidnightEpoch(nowSec, timezone) {
+      function getHms(ep) {
+        try {
+          const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone || undefined, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(new Date(ep * 1000));
+          const map = {};
+          for (const p of parts) map[p.type] = p.value;
+          return { h: Number(map.hour) % 24, m: Number(map.minute), s: Number(map.second) };
+        } catch {
+          const d = new Date(ep * 1000);
+          return { h: d.getHours(), m: d.getMinutes(), s: d.getSeconds() };
+        }
+      }
+      const p = getHms(nowSec);
+      let guess = nowSec - (p.h * 3600 + p.m * 60 + p.s);
+      const chk = getHms(guess);
+      if (chk.h === 23) guess += 3600;
+      else if (chk.h === 1) guess -= 3600;
+      return guess;
+    }
+    function skyPhrase(cond, isNight) {
+      const c = String(cond || '').toLowerCase();
+      if (c.includes('thunder')) return 'stormy skies with thunderstorms in the area';
+      if (c.includes('snow') || c.includes('sleet') || c.includes('wintry')) return 'wintry precipitation moving through';
+      if (c.includes('rain') || c.includes('shower')) return c.includes('possible') || c.includes('light') ? 'scattered showers in the area' : 'wet weather with rain moving through';
+      if (c.includes('fog')) return 'patchy fog and low clouds';
+      if (c.includes('partly')) return isNight ? 'partly cloudy skies' : 'a mix of sun and clouds';
+      if (c.includes('cloud')) return 'mostly cloudy skies';
+      if (c.includes('wind')) return 'breezy conditions';
+      if (c.includes('clear') || c.includes('sun')) return isNight ? 'clear, starlit skies' : 'bright, sunny skies';
+      return c ? `${c} conditions` : 'fair skies';
+    }
+
+    function buildSummary(bf, units, timezone) {
       const cc = bf.current_conditions || {};
       const today = (bf.forecast && bf.forecast.daily && bf.forecast.daily[0]) || null;
       const hourly = (bf.forecast && bf.forecast.hourly) || [];
@@ -1038,7 +1100,7 @@
       const wu = units === 'metric' ? 'km/h' : 'mph';
       const cond = cc.conditions || (today && today.conditions) || 'Clear';
       const parts = [/skies|likely|possible|showers|storms|rain|snow/i.test(cond) ? `${cond}.` : `${cond} skies.`];
-      const hr = new Date().getHours();
+      const hr = getStationHour(timezone);
       if (today) {
         if ((hr >= 16 || hr < 5) && typeof today.air_temp_low === 'number') parts.push(`Low ${Math.round(today.air_temp_low)}${tu}.`);
         else if (typeof today.air_temp_high === 'number') parts.push(`High ${Math.round(today.air_temp_high)}${tu}.`);
@@ -1052,6 +1114,166 @@
         parts.push(`Winds ${dir} at ${minW} to ${maxW} ${wu}.`);
       }
       return parts.join(' ');
+    }
+
+    function buildWeathermanBriefing(bf, units, timezone) {
+      const cc = bf.current_conditions || {};
+      const daily = (bf.forecast && bf.forecast.daily) || [];
+      const today = daily[0] || null;
+      const tomorrow = daily[1] || null;
+      const hourly = (bf.forecast && bf.forecast.hourly) || [];
+      const isMetric = units === 'metric';
+      const tu = isMetric ? '°C' : '°F';
+      const wu = isMetric ? 'km/h' : 'mph';
+      const hr = getStationHour(timezone);
+      const isNight = hr >= 18 || hr < 6;
+      const cond = cc.conditions || (today && today.conditions) || 'Clear';
+      const sky = skyPhrase(cond, isNight);
+      const hi = typeof today?.air_temp_high === 'number' ? Math.round(today.air_temp_high) : null;
+      const lo = typeof today?.air_temp_low === 'number' ? Math.round(today.air_temp_low) : null;
+      const hiF = hi !== null ? (isMetric ? (hi * 9) / 5 + 32 : hi) : 65;
+      const comfort = hiF >= 88 ? 'hot ' : hiF >= 77 ? 'warm ' : hiF >= 64 ? 'mild ' : hiF >= 52 ? 'cool ' : 'chilly ';
+
+      let lead = '';
+      if (hr >= 5 && hr < 12) lead = `Good morning! Expect ${sky} today${hi !== null ? ` with ${comfort}highs climbing near ${hi}${tu}` : ''}${lo !== null ? ` before dipping to ${lo}${tu} tonight.` : '.'}`;
+      else if (hr >= 12 && hr < 17) lead = `This afternoon brings ${sky}${hi !== null ? `, with temperatures topping out near ${hi}${tu}` : ''}${lo !== null ? ` before cooling to around ${lo}${tu} tonight.` : '.'}`;
+      else if (hr >= 17 && hr < 21) lead = `Good evening! Expect ${sky} tonight${lo !== null ? ` as temperatures settle toward an overnight low near ${lo}${tu}.` : '.'}`;
+      else lead = `Tonight brings ${sky}${lo !== null ? ` with temperatures dipping toward an overnight low near ${lo}${tu}.` : '.'}`;
+
+      const pop = typeof today?.precip_probability === 'number' ? Math.round(today.precip_probability) : 0;
+      const next12 = hourly.slice(0, 12);
+      let peakPopH = null;
+      for (const h of next12) if (typeof h.precip_probability === 'number' && (!peakPopH || h.precip_probability > peakPopH.precip_probability)) peakPopH = h;
+      let precipPhrase = 'Dry conditions hold steady';
+      if (pop >= 60) {
+        const peakWhen = peakPopH?.time && peakPopH.precip_probability >= 50 ? ` around ${formatHourBucket(peakPopH.time, timezone)}` : '';
+        precipPhrase = `Keep the umbrella handy with rain likely (${pop}% chance${peakWhen})`;
+      } else if (pop >= 30) precipPhrase = `Watch for a ${pop}% chance of passing showers`;
+
+      const nextWind = hourly.slice(0, 6).filter((h) => typeof h.wind_avg === 'number');
+      let windPhrase = '.';
+      if (nextWind.length >= 2) {
+        const speeds = nextWind.map((h) => h.wind_avg);
+        const minW = Math.max(0, Math.round(Math.min(...speeds)));
+        const maxW = Math.max(minW + 2, Math.round(Math.max(...speeds)));
+        const maxWMph = isMetric ? maxW / 1.60934 : maxW;
+        const dir = nextWind[0].wind_direction_cardinal || cc.wind_direction_cardinal || degToCardinal(cc.wind_direction);
+        windPhrase = maxWMph >= 18 ? ` alongside gusty ${dir} winds at ${minW} to ${maxW} ${wu}.` : maxWMph >= 9 ? ` with a ${dir} breeze at ${minW} to ${maxW} ${wu}.` : ` with light ${dir} winds at ${minW} to ${maxW} ${wu}.`;
+      }
+      let extra = '';
+      if ((hr >= 17 || hr < 5) && typeof tomorrow?.air_temp_high === 'number') {
+        const tomPop = typeof tomorrow.precip_probability === 'number' ? Math.round(tomorrow.precip_probability) : 0;
+        const tomOut = tomPop >= 50 ? `brings a ${tomPop}% chance of rain` : `brings ${skyPhrase(tomorrow.conditions, false)}`;
+        extra = ` Tomorrow ${tomOut} with a high near ${Math.round(tomorrow.air_temp_high)}${tu}.`;
+      } else if (!isNight && typeof cc.uv === 'number' && cc.uv >= 6) {
+        extra = ' Grab sunglasses and SPF with high UV today.';
+      }
+      return `${lead} ${precipPhrase}${windPhrase}${extra}`;
+    }
+
+    function buildBriefingFromDashboard(data) {
+      const cur = data?.current || {}, daily = data?.daily || [], hourly = data?.hourly || [], tz = data?.station?.timezone;
+      return buildWeathermanBriefing({
+        current_conditions: { conditions: cur.conditions, wind_avg: cur.windSpeed, wind_direction: cur.windDirection, wind_direction_cardinal: cur.windCardinal, uv: cur.uv },
+        forecast: {
+          daily: daily.map((d) => ({ air_temp_high: d.high, air_temp_low: d.low, precip_probability: d.precipProbability, conditions: d.conditions })),
+          hourly: hourly.map((h) => ({ time: h.t ?? h.time, precip_probability: h.p ?? 0, wind_avg: h.w ?? 0, wind_direction: h.d ?? 0 })),
+        },
+      }, data?.units || 'imperial', tz);
+    }
+
+    function sumPriorSixDaysPrecipMm(obsPayloads, startEpoch, endEpoch, timezone, precipYesterdayMm) {
+      const days = new Map();
+      const seenEpochs = new Set();
+      let gotValid = false;
+      for (const data of obsPayloads) {
+        if (!data || !Array.isArray(data.obs)) continue;
+        if (data.type !== 'obs_st' && data.type !== 'obs_sky') continue;
+        gotValid = true;
+        const isSky = data.type === 'obs_sky';
+        for (const r of data.obs) {
+          if (!r || typeof r[0] !== 'number' || r[0] < startEpoch || r[0] >= endEpoch) continue;
+          if (seenEpochs.has(r[0])) continue;
+          seenEpochs.add(r[0]);
+          const dayKey = getLocalDateKey(r[0], timezone);
+          if (!days.has(dayKey)) days.set(dayKey, { sumRaw: 0, maxRaw: 0, sumNc: 0, maxNc: 0, useNc: false });
+          const b = days.get(dayKey);
+          const rawInt = isSky ? (typeof r[3] === 'number' ? r[3] : 0) : (typeof r[12] === 'number' ? r[12] : 0);
+          const rawDay = isSky ? (typeof r[11] === 'number' ? r[11] : 0) : (typeof r[18] === 'number' ? r[18] : 0);
+          const ncInt = isSky ? (typeof r[14] === 'number' ? r[14] : null) : (typeof r[19] === 'number' ? r[19] : null);
+          const ncDay = isSky ? (typeof r[15] === 'number' ? r[15] : null) : (typeof r[20] === 'number' ? r[20] : null);
+          const aType = isSky ? r[16] : r[21];
+          b.sumRaw += rawInt;
+          if (rawDay > b.maxRaw) b.maxRaw = rawDay;
+          if (ncInt !== null) b.sumNc += ncInt;
+          if (ncDay !== null && ncDay > b.maxNc) b.maxNc = ncDay;
+          if (aType === 1 && (ncInt !== null || ncDay !== null)) b.useNc = true;
+        }
+      }
+      if (!gotValid) return null;
+      const yestKey = getLocalDateKey(endEpoch - 43200, timezone);
+      let totalMm = 0;
+      for (const [key, d] of days.entries()) {
+        let dayMm = d.useNc ? Math.max(d.sumNc, d.maxNc) : Math.max(d.sumRaw, d.maxRaw);
+        if (key === yestKey && typeof precipYesterdayMm === 'number' && precipYesterdayMm > dayMm) dayMm = precipYesterdayMm;
+        totalMm += dayMm;
+      }
+      if (!days.has(yestKey) && typeof precipYesterdayMm === 'number' && precipYesterdayMm > 0) totalMm += precipYesterdayMm;
+      return totalMm;
+    }
+
+    function resolveStationObj(stJson, stationId) {
+      const list = (stJson && (stJson.stations || stJson.locations)) || [];
+      return list.find((s) => String(s?.station_id ?? s?.location_id ?? '') === String(stationId)) || list[0] || {};
+    }
+
+    function collectCandidateDeviceIds(obJson, devs) {
+      const seen = new Set(), out = [];
+      const add = (id) => { if (id && !seen.has(String(id))) { seen.add(String(id)); out.push(id); } };
+      if (obJson && obJson.device_id) add(obJson.device_id);
+      for (const d of devs) if (d.device_type === 'ST' && d.serial_number) add(d.device_id);
+      for (const d of devs) if (d.device_type === 'SK' && d.serial_number) add(d.device_id);
+      for (const d of devs) if (d.device_type === 'ST' || d.device_type === 'SK') add(d.device_id);
+      return out;
+    }
+
+    function parseTodayObs(td, localDayStart, m) {
+      if (!td || (td.type !== 'obs_st' && td.type !== 'obs_sky') || !Array.isArray(td.obs) || !td.obs.length) return null;
+      const isSky = td.type === 'obs_sky';
+      const rows = [...td.obs].sort((a, b) => (Number(a?.[0]) || 0) - (Number(b?.[0]) || 0));
+      const gustIdx = isSky ? 6 : 3, solarIdx = isSky ? 10 : 11, rainIdx = isSky ? 3 : 12;
+      const todayRows = rows.filter((r) => r && typeof r[0] === 'number' && r[0] >= localDayStart);
+      let windPeakToday = null, solarPeakToday = null, precipRate = 0, pressureChange3hr = null;
+      if (todayRows.length) {
+        let maxG = 0, maxS = 0;
+        for (const r of todayRows) {
+          if (typeof r[gustIdx] === 'number' && r[gustIdx] > maxG) maxG = r[gustIdx];
+          if (typeof r[solarIdx] === 'number' && r[solarIdx] > maxS) maxS = r[solarIdx];
+        }
+        windPeakToday = m ? maxG * 3.6 : maxG * 2.23694;
+        solarPeakToday = maxS;
+        const tail = todayRows.slice(-5);
+        const rainMm = tail.reduce((a, r) => a + (typeof r[rainIdx] === 'number' ? r[rainIdx] : 0), 0);
+        const rateMmHr = (rainMm / tail.length) * 60;
+        precipRate = m ? rateMmHr : rateMmHr / 25.4;
+      }
+      if (!isSky) {
+        const last = rows[rows.length - 1];
+        if (last && typeof last[6] === 'number') {
+          const target = last[0] - 10800;
+          let best = null, bestDiff = Infinity;
+          for (const r of rows) {
+            if (!r || typeof r[6] !== 'number') continue;
+            const diff = Math.abs(r[0] - target);
+            if (diff < bestDiff) { bestDiff = diff; best = r; }
+          }
+          if (best && bestDiff < 5400) {
+            const dMb = last[6] - best[6];
+            pressureChange3hr = m ? Number(dMb.toFixed(1)) : Number((dMb * 0.029529983).toFixed(2));
+          }
+        }
+      }
+      return { windPeakToday, solarPeakToday, pressureChange3hr, precipRate };
     }
 
     async function fetchLiveTempest(stationId, token, units) {
@@ -1075,81 +1297,90 @@
       const bfJson = await bfRes.json();
       const obJson = obRes.ok ? await obRes.json() : {};
 
-      const stObj = (stJson.stations && stJson.stations[0]) || {};
-      const devs = stObj.devices || [];
-      const dev = devs.find((d) => d.device_type === 'ST') || devs.find((d) => d.device_type === 'SK') || null;
-      const deviceId = (dev && dev.device_id) || obJson.device_id || null;
-
-      let windPeakToday = null, solarPeakToday = null, pressureChange3hr = null, precipRate = 0;
-      let priorSixMm = 0, hasPriorSix = false;
-
-      if (deviceId) {
-        try {
-          const tdRes = await fetch(`${TEMPEST_REST_BASE}/observations/device/${deviceId}?day_offset=0&token=${encodeURIComponent(token)}`);
-          if (tdRes.ok) {
-            const td = await tdRes.json();
-            if (td.type === 'obs_st' && Array.isArray(td.obs) && td.obs.length) {
-              const rows = td.obs;
-              let maxG = 0, maxS = 0;
-              for (const r of rows) {
-                if (typeof r[3] === 'number' && r[3] > maxG) maxG = r[3];
-                if (typeof r[11] === 'number' && r[11] > maxS) maxS = r[11];
-              }
-              windPeakToday = m ? maxG * 3.6 : maxG * 2.23694;
-              solarPeakToday = maxS;
-
-              const last = rows[rows.length - 1];
-              if (typeof last[6] === 'number') {
-                const target = last[0] - 10800;
-                let best = null, bestDiff = Infinity;
-                for (const r of rows) {
-                  if (typeof r[6] !== 'number') continue;
-                  const diff = Math.abs(r[0] - target);
-                  if (diff < bestDiff) { bestDiff = diff; best = r; }
-                }
-                if (best && bestDiff < 5400) {
-                  const dMb = last[6] - best[6];
-                  pressureChange3hr = m ? Number(dMb.toFixed(1)) : Number((dMb * 0.029529983).toFixed(2));
-                }
-              }
-              const tail = rows.slice(-5);
-              const rainMm = tail.reduce((a, r) => a + (typeof r[12] === 'number' ? r[12] : 0), 0);
-              const rateMmHr = (rainMm / tail.length) * 60;
-              precipRate = m ? rateMmHr : rateMmHr / 25.4;
-            }
-          }
-        } catch {}
-
-        const cached = state.sevenDayCache[deviceId];
-        if (cached && Date.now() - cached.ts < 1800000) {
-          priorSixMm = cached.mm; hasPriorSix = true;
-        } else {
-          try {
-            const resList = await Promise.all([1,2,3,4,5,6].map((d) =>
-              fetch(`${TEMPEST_REST_BASE}/observations/device/${deviceId}?day_offset=${d}&token=${encodeURIComponent(token)}`).then((r) => r.ok ? r.json() : null).catch(() => null)
-            ));
-            let sum = 0;
-            for (const x of resList) {
-              if (x && x.type === 'obs_st' && Array.isArray(x.obs)) {
-                for (const r of x.obs) if (typeof r[12] === 'number') sum += r[12];
-              }
-            }
-            priorSixMm = sum; hasPriorSix = true;
-            state.sevenDayCache[deviceId] = { ts: Date.now(), mm: sum };
-          } catch {}
-        }
+      let stObj = resolveStationObj(stJson, stationId);
+      if (!Array.isArray(stObj.devices) || !stObj.devices.length) {
+        const allSt = await fetch(`${TEMPEST_REST_BASE}/stations?token=${encodeURIComponent(token)}`).then((r) => r.ok ? r.json() : null).catch(() => null);
+        if (allSt) stObj = resolveStationObj(allSt, stationId);
       }
+      const devs = stObj.devices || [];
+      const candidateDeviceIds = collectCandidateDeviceIds(obJson, devs);
+      let deviceId = candidateDeviceIds[0] || null;
+      const stationTz = stObj.timezone || bfJson.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
       const cc = bfJson.current_conditions || {};
       const lastOb = (obJson.obs && obJson.obs[0]) || {};
       const dailyRaw = (bfJson.forecast && bfJson.forecast.daily) || [];
       const todayFc = dailyRaw[0] || {};
+      const pToday = cc.precip_accum_local_day ?? (typeof lastOb.precip_accum_local_day_final === 'number' ? (m ? lastOb.precip_accum_local_day_final : lastOb.precip_accum_local_day_final / 25.4) : typeof lastOb.precip_accum_local_day === 'number' ? (m ? lastOb.precip_accum_local_day : lastOb.precip_accum_local_day / 25.4) : 0);
+      const pYest = cc.precip_accum_local_yesterday ?? (typeof lastOb.precip_accum_local_yesterday_final === 'number' ? (m ? lastOb.precip_accum_local_yesterday_final : lastOb.precip_accum_local_yesterday_final / 25.4) : typeof lastOb.precip_accum_local_yesterday === 'number' ? (m ? lastOb.precip_accum_local_yesterday : lastOb.precip_accum_local_yesterday / 25.4) : 0);
+      const pYestMm = typeof lastOb.precip_accum_local_yesterday_final === 'number' ? lastOb.precip_accum_local_yesterday_final : typeof lastOb.precip_accum_local_yesterday === 'number' ? lastOb.precip_accum_local_yesterday : (m ? pYest : pYest * 25.4);
+
+      let windPeakToday = null, solarPeakToday = null, pressureChange3hr = null, precipRate = 0;
+      let priorSixMm = 0, hasPriorSix = false;
+
+      if (candidateDeviceIds.length > 0) {
+        const nowSec = Math.floor(Date.now() / 1000);
+        const localDayStart = getLocalMidnightEpoch(nowSec, stationTz);
+        const todayFetchStart = Math.min(localDayStart, nowSec - 14400);
+
+        for (const candId of candidateDeviceIds) {
+          let parsed = null;
+          try {
+            const tdRes = await fetch(`${TEMPEST_REST_BASE}/observations/device/${candId}?time_start=${todayFetchStart}&time_end=${nowSec}&token=${encodeURIComponent(token)}`);
+            if (tdRes.ok) parsed = parseTodayObs(await tdRes.json(), localDayStart, m);
+          } catch {}
+          if (!parsed) {
+            try {
+              const td0Res = await fetch(`${TEMPEST_REST_BASE}/observations/device/${candId}?day_offset=0&token=${encodeURIComponent(token)}`);
+              if (td0Res.ok) parsed = parseTodayObs(await td0Res.json(), localDayStart, m);
+            } catch {}
+          }
+          if (parsed) {
+            deviceId = candId;
+            windPeakToday = parsed.windPeakToday;
+            solarPeakToday = parsed.solarPeakToday;
+            pressureChange3hr = parsed.pressureChange3hr;
+            precipRate = parsed.precipRate;
+            break;
+          }
+        }
+
+        if (deviceId) {
+          const cacheKey = `${deviceId}_${localDayStart}`;
+          const cached = state.sevenDayCache[cacheKey];
+          if (cached && Date.now() - cached.ts < 1800000) {
+            priorSixMm = cached.mm; hasPriorSix = true;
+          } else {
+            try {
+              const start6d = localDayStart - 6 * 86400, mid3d = localDayStart - 3 * 86400;
+              const resList = await Promise.all([
+                fetch(`${TEMPEST_REST_BASE}/observations/device/${deviceId}?time_start=${start6d}&time_end=${mid3d - 1}&token=${encodeURIComponent(token)}`).then((r) => r.ok ? r.json() : null).catch(() => null),
+                fetch(`${TEMPEST_REST_BASE}/observations/device/${deviceId}?time_start=${mid3d}&time_end=${localDayStart - 1}&token=${encodeURIComponent(token)}`).then((r) => r.ok ? r.json() : null).catch(() => null),
+              ]);
+              let valid = resList.filter(Boolean);
+              let isComplete = valid.length === 2;
+              if (!valid.length) {
+                const fb = await Promise.all([1,2,3,4,5,6].map((dOff) => fetch(`${TEMPEST_REST_BASE}/observations/device/${deviceId}?day_offset=${dOff}&token=${encodeURIComponent(token)}`).then((r) => r.ok ? r.json() : null).catch(() => null)));
+                valid = fb.filter(Boolean);
+                isComplete = valid.length >= 5;
+              }
+              const sumMm = sumPriorSixDaysPrecipMm(valid, start6d, localDayStart, stationTz, pYestMm);
+              if (sumMm !== null) {
+                priorSixMm = sumMm; hasPriorSix = true;
+                if (isComplete) state.sevenDayCache[cacheKey] = { ts: Date.now(), mm: sumMm };
+              }
+            } catch {}
+          }
+        }
+      }
+
       const elevM = (stObj.station_meta && stObj.station_meta.elevation) || obJson.elevation || 0;
       const temp = cc.air_temperature ?? 0;
       const windGust = cc.wind_gust ?? cc.wind_avg ?? 0;
       const solar = cc.solar_radiation ?? 0;
-      const pToday = cc.precip_accum_local_day ?? 0;
-      const pYest = cc.precip_accum_local_yesterday ?? 0;
+      const lightningCount1hr = cc.lightning_strike_count_last_1hr ?? lastOb.lightning_strike_count_last_1hr ?? 0;
+      const lightningLastEpoch = cc.lightning_strike_last_epoch ?? lastOb.lightning_strike_last_epoch ?? null;
+      const lightningLastDistance = cc.lightning_strike_last_distance ?? (typeof lastOb.lightning_strike_last_distance === 'number' ? (m ? lastOb.lightning_strike_last_distance : lastOb.lightning_strike_last_distance * 0.621371) : null);
 
       return {
         isDemo: false, units,
@@ -1161,13 +1392,14 @@
           elevationUnit: m ? 'm' : 'ft',
           latitude: stObj.latitude ?? bfJson.latitude ?? 0,
           longitude: stObj.longitude ?? bfJson.longitude ?? 0,
-          timezone: stObj.timezone || bfJson.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezone: stationTz,
         },
         current: {
           epoch: lastOb.timestamp || cc.time || Math.floor(Date.now() / 1000),
           temperature: temp, feelsLike: cc.feels_like ?? temp,
           conditions: cc.conditions || todayFc.conditions || 'Clear',
-          summary: buildSummary(bfJson, units),
+          summary: buildSummary(bfJson, units, stationTz),
+          forecastBriefing: buildWeathermanBriefing(bfJson, units, stationTz),
           icon: cc.icon || todayFc.icon || 'partly-cloudy-day',
           todayLow: todayFc.air_temp_low ?? temp - 8, todayHigh: todayFc.air_temp_high ?? temp + 8,
           humidity: cc.relative_humidity ?? 0, dewPoint: cc.dew_point ?? temp,
@@ -1181,8 +1413,9 @@
           precip7Day: hasPriorSix ? pToday + (m ? priorSixMm : priorSixMm / 25.4) : pToday + pYest,
           uv: cc.uv ?? 0, solarRadiation: solar,
           solarPeakToday: Math.max(solar, solarPeakToday ?? solar),
-          lightningCount1hr: cc.lightning_strike_count_last_1hr ?? 0,
-          lightningLastDistance: cc.lightning_strike_last_distance ?? null,
+          lightningCount1hr,
+          lightningLastDistance,
+          lightningLastEpoch,
         },
         astronomy: { sunriseEpoch: todayFc.sunrise || null, sunsetEpoch: todayFc.sunset || null },
         tides,
@@ -1348,6 +1581,9 @@
       els.heroIcon.innerHTML = getWeatherIconSvg(cur.icon, 54);
       els.conditionTitle.textContent = cur.conditions || 'Clear';
       els.conditionSummary.textContent = cur.summary || '';
+      if (els.weathermanText) {
+        els.weathermanText.textContent = cur.forecastBriefing || buildBriefingFromDashboard(data);
+      }
 
       const low = Number(cur.todayLow ?? tVal - 5), high = Number(cur.todayHigh ?? tVal + 5);
       els.todayLowVal.textContent = `${Math.round(low)}°`; els.todayHighVal.textContent = `${Math.round(high)}°`;
@@ -1430,13 +1666,36 @@
 
       renderTides(data.tides, data.units);
 
-      if (!data.isDemo && cur.lightningCount1hr > 0) {
-        const dStr = cur.lightningLastDistance ? ` · ${Math.round(cur.lightningLastDistance)} ${m ? 'km' : 'mi'}` : '';
-        els.lightningVal.textContent = `${cur.lightningCount1hr} in last hr${dStr}`;
+      const lInfo = formatLightningDisplay(cur, m, st.timezone);
+      if (!data.isDemo && lInfo) {
+        const lbl = els.lightningItem.querySelector('.astro-label');
+        if (lbl) lbl.textContent = lInfo.label;
+        els.lightningVal.textContent = lInfo.text;
         els.lightningItem.classList.remove('hidden');
       } else {
         els.lightningItem.classList.add('hidden');
       }
+    }
+
+    function formatLightningDisplay(cur, isMetric, timezone) {
+      const count = Number(cur?.lightningCount1hr || 0);
+      const lastEpoch = Number(cur?.lightningLastEpoch || 0);
+      const dist = cur?.lightningLastDistance;
+      const du = isMetric ? 'km' : 'mi';
+      const dStr = typeof dist === 'number' && !Number.isNaN(dist) && dist > 0 ? ` · ${Math.round(dist)} ${du}` : '';
+      if (count > 0) return { label: 'Lightning', text: `${count} in last hr${dStr}` };
+      if (lastEpoch > 0) {
+        const ageSec = Math.max(0, Math.floor(Date.now() / 1000) - lastEpoch);
+        let whenStr = '';
+        if (ageSec < 3600) whenStr = `${Math.max(1, Math.round(ageSec / 60))}m ago`;
+        else if (ageSec < 86400) whenStr = `${Math.round(ageSec / 3600)}h ago`;
+        else {
+          try { whenStr = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: timezone }).format(new Date(lastEpoch * 1000)); }
+          catch { whenStr = `${Math.round(ageSec / 86400)}d ago`; }
+        }
+        return { label: 'Last Strike', text: `${whenStr}${dStr}` };
+      }
+      return null;
     }
 
     function renderTides(tides, units) {
@@ -1478,16 +1737,22 @@
         return;
       }
       try {
-        let live;
+        let live = null;
         if (state.proxyUrl) {
-          disconnectWs();
-          state.wsStatus = 'polling';
-          const sep = state.proxyUrl.includes('?') ? '&' : '?';
-          const res = await fetch(`${state.proxyUrl}${sep}stationId=${encodeURIComponent(state.stationId)}&units=${encodeURIComponent(state.units)}`);
-          if (!res.ok) throw new Error(`Proxy returned HTTP ${res.status}.`);
-          live = await res.json();
-          if (live.error) throw new Error(live.error);
-        } else {
+          try {
+            disconnectWs();
+            state.wsStatus = 'polling';
+            const sep = state.proxyUrl.includes('?') ? '&' : '?';
+            const res = await fetch(`${state.proxyUrl}${sep}stationId=${encodeURIComponent(state.stationId)}&units=${encodeURIComponent(state.units)}`);
+            if (!res.ok) throw new Error(`Proxy returned HTTP ${res.status}.`);
+            const candidate = await res.json();
+            if (candidate.error) throw new Error(candidate.error);
+            live = candidate;
+          } catch (proxyErr) {
+            if (!state.token) throw proxyErr;
+          }
+        }
+        if (!live) {
           live = await fetchLiveTempest(state.stationId, state.token, state.units);
           if (live.station.deviceId && state.wsStatus !== 'live') connectWs(state.token, live.station.deviceId);
         }
@@ -1595,10 +1860,6 @@
       loadData(true);
     });
     els.btnRefresh.addEventListener('click', () => loadData(true));
-    els.btnFullscreen.addEventListener('click', () => {
-      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
-      else document.exitFullscreen?.().catch(() => {});
-    });
     els.btnUseDemo.addEventListener('click', () => {
       state.mode = 'demo'; safeStore.set(STORAGE_KEYS.mode, 'demo'); closeModal(); loadData(false);
     });

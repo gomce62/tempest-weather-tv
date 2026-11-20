@@ -108,6 +108,9 @@ export function getDemoDashboardData(units = 'imperial') {
       summary: isMetric
         ? 'Partly cloudy skies. Low 9°C. Winds SW at 8 to 16 km/h.'
         : 'Partly cloudy skies. Low 48°F. Winds SW at 5 to 10 mph.',
+      forecastBriefing: isMetric
+        ? 'Good evening! Expect partly cloudy skies tonight as temperatures settle toward an overnight low near 9°C. Dry conditions hold steady with light SW winds at 8 to 16 km/h. Tomorrow looks bright and sunny with a high near 21°C.'
+        : 'Good evening! Expect partly cloudy skies tonight as temperatures settle toward an overnight low near 48°F. Dry conditions hold steady with light SW winds at 5 to 10 mph. Tomorrow looks bright and sunny with a high near 69°F.',
       icon: 'partly-cloudy-night',
       todayLow: toTemp(48),
       todayHigh: toTemp(69),
@@ -123,7 +126,7 @@ export function getDemoDashboardData(units = 'imperial') {
       pressureChange3hr: isMetric ? -0.3 : -0.01,
       precipToday: toPrecip(0),
       precipRate: toPrecip(0),
-      precip7Day: toPrecip(0),
+      precip7Day: toPrecip(0.42),
       uv: 0,
       solarRadiation: 13.4,
       solarPeakToday: 293,

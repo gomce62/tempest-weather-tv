@@ -136,8 +136,86 @@ function Degrees-ToCardinal {
     return $dirs[$idx]
 }
 
+function Get-StationHour {
+    param([string]$Timezone)
+    try {
+        if ($Timezone) {
+            $tz = [System.TimeZoneInfo]::FindSystemTimeZoneById($Timezone)
+            return [System.TimeZoneInfo]::ConvertTimeFromUtc([DateTime]::UtcNow, $tz).Hour
+        }
+    } catch {}
+    return (Get-Date).Hour
+}
+
+function Format-HourBucket {
+    param([double]$EpochSec, [string]$Timezone)
+    try {
+        $utc = [DateTimeOffset]::FromUnixTimeSeconds([long]$EpochSec).UtcDateTime
+        $dt = $utc.ToLocalTime()
+        if ($Timezone) {
+            try {
+                $tz = [System.TimeZoneInfo]::FindSystemTimeZoneById($Timezone)
+                $dt = [System.TimeZoneInfo]::ConvertTimeFromUtc($utc, $tz)
+            } catch {}
+        }
+        $h = $dt.Hour
+        $ampm = if ($h -ge 12) { 'PM' } else { 'AM' }
+        $h12 = $h % 12
+        if ($h12 -eq 0) { $h12 = 12 }
+        return "$h12 $ampm"
+    } catch { return '' }
+}
+
+function Get-LocalDateKey {
+    param([double]$EpochSec, [string]$Timezone)
+    try {
+        $utc = [DateTimeOffset]::FromUnixTimeSeconds([long]$EpochSec).UtcDateTime
+        $dt = $utc.ToLocalTime()
+        if ($Timezone) {
+            try {
+                $tz = [System.TimeZoneInfo]::FindSystemTimeZoneById($Timezone)
+                $dt = [System.TimeZoneInfo]::ConvertTimeFromUtc($utc, $tz)
+            } catch {}
+        }
+        return $dt.ToString('yyyy-MM-dd')
+    } catch { return '0' }
+}
+
+function Get-LocalMidnightEpoch {
+    param([long]$NowSec, [string]$Timezone)
+    try {
+        $utc = [DateTimeOffset]::FromUnixTimeSeconds($NowSec).UtcDateTime
+        $tz = if ($Timezone) { [System.TimeZoneInfo]::FindSystemTimeZoneById($Timezone) } else { [System.TimeZoneInfo]::Local }
+        $localDt = [System.TimeZoneInfo]::ConvertTimeFromUtc($utc, $tz)
+        $midnightLocal = [DateTime]::new($localDt.Year, $localDt.Month, $localDt.Day, 0, 0, 0, [DateTimeKind]::Unspecified)
+        $midnightUtc = [System.TimeZoneInfo]::ConvertTimeToUtc($midnightLocal, $tz)
+        return [long]([DateTimeOffset]::new($midnightUtc).ToUnixTimeSeconds())
+    } catch {
+        $d = (Get-Date).Date
+        return [long]([DateTimeOffset]::new($d).ToUnixTimeSeconds())
+    }
+}
+
+function Get-SkyPhrase {
+    param([string]$Cond, [bool]$IsNight)
+    $c = "$Cond".ToLower()
+    if ($c -match 'thunder') { return 'stormy skies with thunderstorms in the area' }
+    if ($c -match 'snow|sleet|wintry') { return 'wintry precipitation moving through' }
+    if ($c -match 'rain|shower') {
+        if ($c -match 'possible|light') { return 'scattered showers in the area' }
+        return 'wet weather with rain moving through'
+    }
+    if ($c -match 'fog') { return 'patchy fog and low clouds' }
+    if ($c -match 'partly') { if ($IsNight) { return 'partly cloudy skies' } else { return 'a mix of sun and clouds' } }
+    if ($c -match 'cloud') { return 'mostly cloudy skies' }
+    if ($c -match 'wind') { return 'breezy conditions' }
+    if ($c -match 'clear|sun') { if ($IsNight) { return 'clear, starlit skies' } else { return 'bright, sunny skies' } }
+    if ($c) { return "$c conditions" }
+    return 'fair skies'
+}
+
 function Build-NarrativeSummary {
-    param($ForecastJson, [string]$Units)
+    param($ForecastJson, [string]$Units, [string]$Timezone)
     $cc = $ForecastJson.current_conditions
     $daily = $ForecastJson.forecast.daily
     $hourly = $ForecastJson.forecast.hourly
@@ -155,7 +233,7 @@ function Build-NarrativeSummary {
         $parts.Add("$cond skies.")
     }
 
-    $hrNow = (Get-Date).Hour
+    $hrNow = Get-StationHour -Timezone $Timezone
     if ($daily -and $daily.Count -gt 0) {
         if ($hrNow -ge 16 -or $hrNow -lt 5) {
             if ($null -ne $daily[0].air_temp_low) {
@@ -183,6 +261,239 @@ function Build-NarrativeSummary {
     }
 
     return ($parts -join ' ')
+}
+
+function Build-WeathermanBriefing {
+    param($ForecastJson, [string]$Units, [string]$Timezone)
+    $cc = $ForecastJson.current_conditions
+    $daily = @($ForecastJson.forecast.daily)
+    $today = if ($daily.Count -gt 0) { $daily[0] } else { $null }
+    $tomorrow = if ($daily.Count -gt 1) { $daily[1] } else { $null }
+    $hourly = @($ForecastJson.forecast.hourly)
+    $isMetric = ($Units -eq 'metric')
+    $tu = if ($isMetric) { [char]0x00B0 + 'C' } else { [char]0x00B0 + 'F' }
+    $wu = if ($isMetric) { 'km/h' } else { 'mph' }
+    $hr = Get-StationHour -Timezone $Timezone
+    $isNight = ($hr -ge 18 -or $hr -lt 6)
+    $cond = if ($cc -and $cc.conditions) { [string]$cc.conditions } elseif ($today -and $today.conditions) { [string]$today.conditions } else { 'Clear' }
+    $sky = Get-SkyPhrase -Cond $cond -IsNight $isNight
+
+    $hi = if ($today -and $null -ne $today.air_temp_high) { [int][Math]::Round([double]$today.air_temp_high) } else { $null }
+    $lo = if ($today -and $null -ne $today.air_temp_low) { [int][Math]::Round([double]$today.air_temp_low) } else { $null }
+    $hiF = if ($null -ne $hi) { if ($isMetric) { ($hi * 9.0 / 5.0) + 32.0 } else { [double]$hi } } else { 65.0 }
+    $comfort = if ($hiF -ge 88) { 'hot ' } elseif ($hiF -ge 77) { 'warm ' } elseif ($hiF -ge 64) { 'mild ' } elseif ($hiF -ge 52) { 'cool ' } else { 'chilly ' }
+
+    $lead = ''
+    if ($hr -ge 5 -and $hr -lt 12) {
+        $hiTxt = if ($null -ne $hi) { " with ${comfort}highs climbing near $hi$tu" } else { '' }
+        $loTxt = if ($null -ne $lo) { " before dipping to $lo$tu tonight." } else { '.' }
+        $lead = "Good morning! Expect $sky today$hiTxt$loTxt"
+    } elseif ($hr -ge 12 -and $hr -lt 17) {
+        $hiTxt = if ($null -ne $hi) { ", with temperatures topping out near $hi$tu" } else { '' }
+        $loTxt = if ($null -ne $lo) { " before cooling to around $lo$tu tonight." } else { '.' }
+        $lead = "This afternoon brings $sky$hiTxt$loTxt"
+    } elseif ($hr -ge 17 -and $hr -lt 21) {
+        $loTxt = if ($null -ne $lo) { " as temperatures settle toward an overnight low near $lo$tu." } else { '.' }
+        $lead = "Good evening! Expect $sky tonight$loTxt"
+    } else {
+        $loTxt = if ($null -ne $lo) { " with temperatures dipping toward an overnight low near $lo$tu." } else { '.' }
+        $lead = "Tonight brings $sky$loTxt"
+    }
+
+    $pop = if ($today -and $null -ne $today.precip_probability) { [int][Math]::Round([double]$today.precip_probability) } else { 0 }
+    $peakPopH = $null
+    foreach ($h in ($hourly | Select-Object -First 12)) {
+        if ($null -ne $h.precip_probability) {
+            if (-not $peakPopH -or [double]$h.precip_probability -gt [double]$peakPopH.precip_probability) { $peakPopH = $h }
+        }
+    }
+    $precipPhrase = 'Dry conditions hold steady'
+    if ($pop -ge 60) {
+        $peakWhen = if ($peakPopH -and $peakPopH.time -and [double]$peakPopH.precip_probability -ge 50) { " around $(Format-HourBucket -EpochSec ([double]$peakPopH.time) -Timezone $Timezone)" } else { '' }
+        $precipPhrase = "Keep the umbrella handy with rain likely ($pop% chance$peakWhen)"
+    } elseif ($pop -ge 30) {
+        $precipPhrase = "Watch for a $pop% chance of passing showers"
+    }
+
+    $windSlice = @($hourly | Select-Object -First 6 | Where-Object { $null -ne $_.wind_avg })
+    $windPhrase = '.'
+    if ($windSlice.Count -ge 2) {
+        $speeds = @($windSlice | ForEach-Object { [double]$_.wind_avg })
+        $minW = [Math]::Max(0, [int][Math]::Round(($speeds | Measure-Object -Minimum).Minimum))
+        $maxW = [Math]::Max($minW + 2, [int][Math]::Round(($speeds | Measure-Object -Maximum).Maximum))
+        $maxWMph = if ($isMetric) { $maxW / 1.60934 } else { [double]$maxW }
+        $dir = if ($windSlice[0].wind_direction_cardinal) { $windSlice[0].wind_direction_cardinal } elseif ($cc.wind_direction_cardinal) { $cc.wind_direction_cardinal } else { Degrees-ToCardinal ([double]$cc.wind_direction) }
+        if ($maxWMph -ge 18) { $windPhrase = " alongside gusty $dir winds at $minW to $maxW $wu." }
+        elseif ($maxWMph -ge 9) { $windPhrase = " with a $dir breeze at $minW to $maxW $wu." }
+        else { $windPhrase = " with light $dir winds at $minW to $maxW $wu." }
+    }
+
+    $extra = ''
+    if (($hr -ge 17 -or $hr -lt 5) -and $tomorrow -and $null -ne $tomorrow.air_temp_high) {
+        $tomPop = if ($null -ne $tomorrow.precip_probability) { [int][Math]::Round([double]$tomorrow.precip_probability) } else { 0 }
+        $tomOut = if ($tomPop -ge 50) { "brings a $tomPop% chance of rain" } else { "brings $(Get-SkyPhrase -Cond ([string]$tomorrow.conditions) -IsNight $false)" }
+        $extra = " Tomorrow $tomOut with a high near $([int][Math]::Round([double]$tomorrow.air_temp_high))$tu."
+    } elseif ((-not $isNight) -and $cc -and $null -ne $cc.uv -and [double]$cc.uv -ge 6) {
+        $extra = ' Grab sunglasses and SPF with high UV today.'
+    }
+
+    return "$lead $precipPhrase$windPhrase$extra"
+}
+
+function Sum-PriorSixDaysPrecipMm {
+    param($ObsPayloads, [long]$StartEpoch, [long]$EndEpoch, [string]$Timezone, $PrecipYesterdayMm)
+    $days = @{}
+    $seenEpochs = @{}
+    $gotValid = $false
+
+    foreach ($data in $ObsPayloads) {
+        if (-not $data -or -not $data.obs) { continue }
+        if ($data.type -ne 'obs_st' -and $data.type -ne 'obs_sky') { continue }
+        $gotValid = $true
+        $isSky = ($data.type -eq 'obs_sky')
+        foreach ($r in $data.obs) {
+            if (-not $r -or $null -eq $r[0]) { continue }
+            $ts = [long]$r[0]
+            if ($ts -lt $StartEpoch -or $ts -ge $EndEpoch) { continue }
+            if ($seenEpochs.ContainsKey($ts)) { continue }
+            $seenEpochs[$ts] = $true
+            $dayKey = Get-LocalDateKey -EpochSec $ts -Timezone $Timezone
+            if (-not $days.ContainsKey($dayKey)) {
+                $days[$dayKey] = @{ sumRaw = 0.0; maxRaw = 0.0; sumNc = 0.0; maxNc = 0.0; useNc = $false }
+            }
+            $b = $days[$dayKey]
+            $rawInt = if ($isSky) { if ($null -ne $r[3]) { [double]$r[3] } else { 0.0 } } else { if ($null -ne $r[12]) { [double]$r[12] } else { 0.0 } }
+            $rawDay = if ($isSky) { if ($null -ne $r[11]) { [double]$r[11] } else { 0.0 } } else { if ($null -ne $r[18]) { [double]$r[18] } else { 0.0 } }
+            $ncInt = if ($isSky) { if ($r.Count -gt 14 -and $null -ne $r[14]) { [double]$r[14] } else { $null } } else { if ($r.Count -gt 19 -and $null -ne $r[19]) { [double]$r[19] } else { $null } }
+            $ncDay = if ($isSky) { if ($r.Count -gt 15 -and $null -ne $r[15]) { [double]$r[15] } else { $null } } else { if ($r.Count -gt 20 -and $null -ne $r[20]) { [double]$r[20] } else { $null } }
+            $aType = if ($isSky) { if ($r.Count -gt 16) { $r[16] } else { $null } } else { if ($r.Count -gt 21) { $r[21] } else { $null } }
+
+            $b.sumRaw += $rawInt
+            if ($rawDay -gt $b.maxRaw) { $b.maxRaw = $rawDay }
+            if ($null -ne $ncInt) { $b.sumNc += $ncInt }
+            if ($null -ne $ncDay -and $ncDay -gt $b.maxNc) { $b.maxNc = $ncDay }
+            if ($aType -eq 1 -and ($null -ne $ncInt -or $null -ne $ncDay)) { $b.useNc = $true }
+        }
+    }
+
+    if (-not $gotValid) { return $null }
+
+    $yestKey = Get-LocalDateKey -EpochSec ($EndEpoch - 43200) -Timezone $Timezone
+    $totalMm = 0.0
+    foreach ($key in $days.Keys) {
+        $d = $days[$key]
+        $dayMm = if ($d.useNc) { [Math]::Max($d.sumNc, $d.maxNc) } else { [Math]::Max($d.sumRaw, $d.maxRaw) }
+        if ($key -eq $yestKey -and $null -ne $PrecipYesterdayMm -and [double]$PrecipYesterdayMm -gt $dayMm) {
+            $dayMm = [double]$PrecipYesterdayMm
+        }
+        $totalMm += $dayMm
+    }
+    if (-not $days.ContainsKey($yestKey) -and $null -ne $PrecipYesterdayMm -and [double]$PrecipYesterdayMm -gt 0) {
+        $totalMm += [double]$PrecipYesterdayMm
+    }
+    return $totalMm
+}
+
+function Resolve-StationObj {
+    param($StationJson, [string]$StationId)
+    if (-not $StationJson) { return $null }
+    $list = $null
+    if ($StationJson.stations) { $list = $StationJson.stations }
+    elseif ($StationJson.locations) { $list = $StationJson.locations }
+    if (-not $list -or $list.Count -eq 0) { return $null }
+    foreach ($s in $list) {
+        $sidVal = if ($null -ne $s.station_id) { "$($s.station_id)" } elseif ($null -ne $s.location_id) { "$($s.location_id)" } else { '' }
+        if ($sidVal -eq "$StationId") { return $s }
+    }
+    return $list[0]
+}
+
+function Get-CandidateDeviceIds {
+    param($ObsJson, $Devices)
+    $out = New-Object System.Collections.ArrayList
+    $seen = @{}
+    function Add-Id($id) {
+        if (-not $id) { return }
+        $k = "$id"
+        if (-not $seen.ContainsKey($k)) {
+            $seen[$k] = $true
+            [void]$out.Add($id)
+        }
+    }
+    if ($ObsJson -and $ObsJson.device_id) { Add-Id $ObsJson.device_id }
+    if ($Devices) {
+        foreach ($d in $Devices) { if ($d.device_type -eq 'ST' -and $d.serial_number) { Add-Id $d.device_id } }
+        foreach ($d in $Devices) { if ($d.device_type -eq 'SK' -and $d.serial_number) { Add-Id $d.device_id } }
+        foreach ($d in $Devices) { if ($d.device_type -eq 'ST' -or $d.device_type -eq 'SK') { Add-Id $d.device_id } }
+    }
+    return $out
+}
+
+function Parse-TodayObs {
+    param($TodayObs, [long]$LocalDayStart, [bool]$IsMetric)
+    if (-not $TodayObs -or -not $TodayObs.obs -or $TodayObs.obs.Count -eq 0) { return $null }
+    if ($TodayObs.type -ne 'obs_st' -and $TodayObs.type -ne 'obs_sky') { return $null }
+
+    $isSky = ($TodayObs.type -eq 'obs_sky')
+    $rows = @($TodayObs.obs | Sort-Object { if ($_ -and $null -ne $_[0]) { [long]$_[0] } else { 0 } })
+    $gustIdx = if ($isSky) { 6 } else { 3 }
+    $solarIdx = if ($isSky) { 10 } else { 11 }
+    $rainIdx = if ($isSky) { 3 } else { 12 }
+
+    $todayRows = @($rows | Where-Object { $_ -and $null -ne $_[0] -and [long]$_[0] -ge $LocalDayStart })
+    $windPeakToday = $null
+    $solarPeakToday = $null
+    $precipRate = 0.0
+
+    if ($todayRows.Count -gt 0) {
+        $maxGustMps = 0.0
+        $maxSolar = 0.0
+        foreach ($r in $todayRows) {
+            if ($null -ne $r[$gustIdx] -and [double]$r[$gustIdx] -gt $maxGustMps) { $maxGustMps = [double]$r[$gustIdx] }
+            if ($null -ne $r[$solarIdx] -and [double]$r[$solarIdx] -gt $maxSolar) { $maxSolar = [double]$r[$solarIdx] }
+        }
+        $windPeakToday = if ($IsMetric) { $maxGustMps * 3.6 } else { $maxGustMps * 2.23694 }
+        $solarPeakToday = $maxSolar
+
+        $tailCount = [Math]::Min(5, $todayRows.Count)
+        $rainSumMm = 0.0
+        for ($i = $todayRows.Count - $tailCount; $i -lt $todayRows.Count; $i++) {
+            if ($null -ne $todayRows[$i][$rainIdx]) { $rainSumMm += [double]$todayRows[$i][$rainIdx] }
+        }
+        $rateMmHr = ($rainSumMm / $tailCount) * 60.0
+        $precipRate = if ($IsMetric) { $rateMmHr } else { $rateMmHr / 25.4 }
+    }
+
+    $pressureChange3hr = $null
+    if (-not $isSky -and $rows.Count -gt 0) {
+        $latestRow = $rows[$rows.Count - 1]
+        $latestEpoch = [double]$latestRow[0]
+        $latestPressMb = $latestRow[6]
+        if ($null -ne $latestPressMb) {
+            $targetEpoch = $latestEpoch - 10800
+            $bestRow = $null
+            $bestDiff = 9999999
+            foreach ($r in $rows) {
+                if ($null -eq $r[6]) { continue }
+                $diff = [Math]::Abs([double]$r[0] - $targetEpoch)
+                if ($diff -lt $bestDiff) {
+                    $bestDiff = $diff
+                    $bestRow = $r
+                }
+            }
+            if ($bestRow -and $bestDiff -lt 5400) {
+                $deltaMb = [double]$latestPressMb - [double]$bestRow[6]
+                $pressureChange3hr = if ($IsMetric) { [Math]::Round($deltaMb, 1) } else { [Math]::Round($deltaMb * 0.029529983, 2) }
+            }
+        }
+    }
+
+    return @{
+        windPeakToday = $windPeakToday
+        solarPeakToday = $solarPeakToday
+        pressureChange3hr = $pressureChange3hr
+        precipRate = $precipRate
+    }
 }
 
 function Invoke-TempestGet {
@@ -225,21 +536,36 @@ function Get-TempestDashboardPayload {
     $obsJson = $null
     try { $obsJson = Invoke-TempestGet $obsUrl } catch {}
 
-    $stationObj = $null
-    if ($stationJson -and $stationJson.stations -and $stationJson.stations.Count -gt 0) {
-        $stationObj = $stationJson.stations[0]
+    $stationObj = Resolve-StationObj -StationJson $stationJson -StationId $StationId
+    if (-not $stationObj -or -not $stationObj.devices -or $stationObj.devices.Count -eq 0) {
+        try {
+            $allSt = Invoke-TempestGet "$TempestBase/stations?token=$tokEsc"
+            $foundSt = Resolve-StationObj -StationJson $allSt -StationId $StationId
+            if ($foundSt) { $stationObj = $foundSt }
+        } catch {}
     }
 
-    # Locate primary Tempest / Sky device ID for today's history & live WebSocket
-    $deviceId = $null
-    if ($stationObj -and $stationObj.devices) {
-        $stDev = $stationObj.devices | Where-Object { $_.device_type -eq 'ST' } | Select-Object -First 1
-        if (-not $stDev) { $stDev = $stationObj.devices | Where-Object { $_.device_type -eq 'SK' } | Select-Object -First 1 }
-        if ($stDev) { $deviceId = $stDev.device_id }
-    }
-    if (-not $deviceId -and $obsJson -and $obsJson.device_id) {
-        $deviceId = $obsJson.device_id
-    }
+    $devices = if ($stationObj -and $stationObj.devices) { $stationObj.devices } else { @() }
+    $candidateDeviceIds = Get-CandidateDeviceIds -ObsJson $obsJson -Devices $devices
+    $deviceId = if ($candidateDeviceIds.Count -gt 0) { $candidateDeviceIds[0] } else { $null }
+
+    $cc = $forecastJson.current_conditions
+    $latestObs = if ($obsJson -and $obsJson.obs -and $obsJson.obs.Count -gt 0) { $obsJson.obs[0] } else { $null }
+    $dailyRaw = @($forecastJson.forecast.daily)
+    $todayFc = if ($dailyRaw.Count -gt 0) { $dailyRaw[0] } else { $null }
+    $tz = if ($stationObj -and $stationObj.timezone) { [string]$stationObj.timezone } elseif ($forecastJson.timezone) { [string]$forecastJson.timezone } else { 'UTC' }
+
+    $precipToday = if ($null -ne $cc.precip_accum_local_day) { [double]$cc.precip_accum_local_day }
+        elseif ($latestObs -and $null -ne $latestObs.precip_accum_local_day_final) { if ($isMetric) { [double]$latestObs.precip_accum_local_day_final } else { [double]$latestObs.precip_accum_local_day_final / 25.4 } }
+        elseif ($latestObs -and $null -ne $latestObs.precip_accum_local_day) { if ($isMetric) { [double]$latestObs.precip_accum_local_day } else { [double]$latestObs.precip_accum_local_day / 25.4 } }
+        else { 0.0 }
+    $precipYesterday = if ($null -ne $cc.precip_accum_local_yesterday) { [double]$cc.precip_accum_local_yesterday }
+        elseif ($latestObs -and $null -ne $latestObs.precip_accum_local_yesterday_final) { if ($isMetric) { [double]$latestObs.precip_accum_local_yesterday_final } else { [double]$latestObs.precip_accum_local_yesterday_final / 25.4 } }
+        elseif ($latestObs -and $null -ne $latestObs.precip_accum_local_yesterday) { if ($isMetric) { [double]$latestObs.precip_accum_local_yesterday } else { [double]$latestObs.precip_accum_local_yesterday / 25.4 } }
+        else { 0.0 }
+    $precipYestMm = if ($latestObs -and $null -ne $latestObs.precip_accum_local_yesterday_final) { [double]$latestObs.precip_accum_local_yesterday_final }
+        elseif ($latestObs -and $null -ne $latestObs.precip_accum_local_yesterday) { [double]$latestObs.precip_accum_local_yesterday }
+        elseif ($isMetric) { $precipYesterday } else { $precipYesterday * 25.4 }
 
     # Fetch today's observations to compute Peak Wind Today, Peak Solar Today, 3-Hr Pressure Delta, Precip Rate
     $windPeakToday = $null
@@ -249,86 +575,68 @@ function Get-TempestDashboardPayload {
     $priorSixDaysMm = 0.0
     $hasPriorSixDays = $false
 
-    if ($deviceId) {
-        try {
-            $nowSec = [int][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-            $localDayStart = $nowSec - 86400
-            if ($forecastJson.forecast -and $forecastJson.forecast.daily -and $forecastJson.forecast.daily.Count -gt 0 -and $forecastJson.forecast.daily[0].day_start_local) {
-                $localDayStart = [int]$forecastJson.forecast.daily[0].day_start_local
-            }
-            $todayObs = Invoke-TempestGet "$TempestBase/observations/device/$deviceId`?time_start=$localDayStart&time_end=$nowSec&token=$tokEsc"
-            if ($todayObs -and $todayObs.obs -and $todayObs.obs.Count -gt 0 -and $todayObs.type -eq 'obs_st') {
-                $rows = $todayObs.obs
-                $maxGustMps = 0.0
-                $maxSolar = 0.0
-                foreach ($r in $rows) {
-                    if ($null -ne $r[3] -and [double]$r[3] -gt $maxGustMps) { $maxGustMps = [double]$r[3] }
-                    if ($null -ne $r[11] -and [double]$r[11] -gt $maxSolar) { $maxSolar = [double]$r[11] }
-                }
-                $windPeakToday = if ($isMetric) { $maxGustMps * 3.6 } else { $maxGustMps * 2.23694 }
-                $solarPeakToday = $maxSolar
+    if ($candidateDeviceIds.Count -gt 0) {
+        $nowSec = [long][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        $localDayStart = Get-LocalMidnightEpoch -NowSec $nowSec -Timezone $tz
+        $todayFetchStart = [Math]::Min($localDayStart, $nowSec - 14400)
 
-                # Latest observation & 3-hour pressure delta
-                $latestRow = $rows[$rows.Count - 1]
-                $latestEpoch = [double]$latestRow[0]
-                $latestPressMb = $latestRow[6]
-                if ($null -ne $latestPressMb) {
-                    $targetEpoch = $latestEpoch - 10800
-                    $bestRow = $null
-                    $bestDiff = 9999999
-                    foreach ($r in $rows) {
-                        if ($null -eq $r[6]) { continue }
-                        $diff = [Math]::Abs([double]$r[0] - $targetEpoch)
-                        if ($diff -lt $bestDiff) {
-                            $bestDiff = $diff
-                            $bestRow = $r
-                        }
-                    }
-                    if ($bestRow -and $bestDiff -lt 5400) {
-                        $deltaMb = [double]$latestPressMb - [double]$bestRow[6]
-                        $pressureChange3hr = if ($isMetric) { [Math]::Round($deltaMb, 1) } else { [Math]::Round($deltaMb * 0.029529983, 2) }
-                    }
-                }
-
-                # Recent 5-minute rain rate
-                $tailCount = [Math]::Min(5, $rows.Count)
-                $rainSumMm = 0.0
-                for ($i = $rows.Count - $tailCount; $i -lt $rows.Count; $i++) {
-                    if ($null -ne $rows[$i][12]) { $rainSumMm += [double]$rows[$i][12] }
-                }
-                $rateMmHr = ($rainSumMm / $tailCount) * 60.0
-                $precipRate = if ($isMetric) { $rateMmHr } else { $rateMmHr / 25.4 }
-            }
-        } catch {}
-
-        # Cached 6-day prior precipitation (day_offset 1..6) for accurate 7-Day total
-        $cacheKey = "$deviceId"
-        $nowUtc = [DateTime]::UtcNow
-        if ($SevenDayCache.ContainsKey($cacheKey) -and ($nowUtc - $SevenDayCache[$cacheKey].Time).TotalMinutes -lt 30) {
-            $priorSixDaysMm = $SevenDayCache[$cacheKey].Mm
-            $hasPriorSixDays = $true
-        } else {
+        foreach ($candId in $candidateDeviceIds) {
+            $parsed = $null
             try {
-                $sumPrior = 0.0
-                for ($d = 1; $d -le 6; $d++) {
-                    $dayData = Invoke-TempestGet "$TempestBase/observations/device/$deviceId`?day_offset=$d&token=$tokEsc"
-                    if ($dayData -and $dayData.obs -and $dayData.type -eq 'obs_st') {
-                        foreach ($r in $dayData.obs) {
-                            if ($null -ne $r[12]) { $sumPrior += [double]$r[12] }
+                $todayObs = Invoke-TempestGet "$TempestBase/observations/device/$candId`?time_start=$todayFetchStart&time_end=$nowSec&token=$tokEsc"
+                $parsed = Parse-TodayObs -TodayObs $todayObs -LocalDayStart $localDayStart -IsMetric $isMetric
+            } catch {}
+            if (-not $parsed) {
+                try {
+                    $td0 = Invoke-TempestGet "$TempestBase/observations/device/$candId`?day_offset=0&token=$tokEsc"
+                    $parsed = Parse-TodayObs -TodayObs $td0 -LocalDayStart $localDayStart -IsMetric $isMetric
+                } catch {}
+            }
+            if ($parsed) {
+                $deviceId = $candId
+                $windPeakToday = $parsed.windPeakToday
+                $solarPeakToday = $parsed.solarPeakToday
+                $pressureChange3hr = $parsed.pressureChange3hr
+                $precipRate = $parsed.precipRate
+                break
+            }
+        }
+
+        # Cached 6-day prior precipitation (2 local-time 3-day chunks, RainCheck-aware)
+        if ($deviceId) {
+            $cacheKey = "${deviceId}_${localDayStart}"
+            $nowUtc = [DateTime]::UtcNow
+            if ($SevenDayCache.ContainsKey($cacheKey) -and ($nowUtc - $SevenDayCache[$cacheKey].Time).TotalMinutes -lt 30) {
+                $priorSixDaysMm = $SevenDayCache[$cacheKey].Mm
+                $hasPriorSixDays = $true
+            } else {
+                try {
+                    $start6d = $localDayStart - 6 * 86400
+                    $mid3d = $localDayStart - 3 * 86400
+                    $end1 = $mid3d - 1
+                    $end2 = $localDayStart - 1
+                    $payloads = @()
+                    try { $p1 = Invoke-TempestGet "$TempestBase/observations/device/$deviceId`?time_start=$start6d&time_end=$end1&token=$tokEsc"; if ($p1) { $payloads += $p1 } } catch {}
+                    try { $p2 = Invoke-TempestGet "$TempestBase/observations/device/$deviceId`?time_start=$mid3d&time_end=$end2&token=$tokEsc"; if ($p2) { $payloads += $p2 } } catch {}
+                    $isComplete = ($payloads.Count -eq 2)
+                    if ($payloads.Count -eq 0) {
+                        for ($dOff = 1; $dOff -le 6; $dOff++) {
+                            try { $fb = Invoke-TempestGet "$TempestBase/observations/device/$deviceId`?day_offset=$dOff&token=$tokEsc"; if ($fb) { $payloads += $fb } } catch {}
+                        }
+                        $isComplete = ($payloads.Count -ge 5)
+                    }
+                    $sumMm = Sum-PriorSixDaysPrecipMm -ObsPayloads $payloads -StartEpoch $start6d -EndEpoch $localDayStart -Timezone $tz -PrecipYesterdayMm $precipYestMm
+                    if ($null -ne $sumMm) {
+                        $priorSixDaysMm = [double]$sumMm
+                        $hasPriorSixDays = $true
+                        if ($isComplete) {
+                            $SevenDayCache[$cacheKey] = @{ Time = $nowUtc; Mm = [double]$sumMm }
                         }
                     }
-                }
-                $priorSixDaysMm = $sumPrior
-                $hasPriorSixDays = $true
-                $SevenDayCache[$cacheKey] = @{ Time = $nowUtc; Mm = $sumPrior }
-            } catch {}
+                } catch {}
+            }
         }
     }
-
-    $cc = $forecastJson.current_conditions
-    $latestObs = if ($obsJson -and $obsJson.obs -and $obsJson.obs.Count -gt 0) { $obsJson.obs[0] } else { $null }
-    $dailyRaw = @($forecastJson.forecast.daily)
-    $todayFc = if ($dailyRaw.Count -gt 0) { $dailyRaw[0] } else { $null }
 
     $elevMeters = 0.0
     if ($stationObj -and $stationObj.station_meta -and $null -ne $stationObj.station_meta.elevation) {
@@ -349,8 +657,6 @@ function Get-TempestDashboardPayload {
     $pressure = if ($null -ne $cc.sea_level_pressure) { [double]$cc.sea_level_pressure } elseif ($null -ne $cc.station_pressure) { [double]$cc.station_pressure } elseif ($isMetric) { 1013.2 } else { 29.92 }
     $pressTrend = if ($cc.pressure_trend) { ([string]$cc.pressure_trend).ToLower() } else { 'steady' }
 
-    $precipToday = if ($null -ne $cc.precip_accum_local_day) { [double]$cc.precip_accum_local_day } else { 0.0 }
-    $precipYesterday = if ($null -ne $cc.precip_accum_local_yesterday) { [double]$cc.precip_accum_local_yesterday } else { 0.0 }
     $precip7Day = if ($hasPriorSixDays) {
         $priorDisp = if ($isMetric) { $priorSixDaysMm } else { $priorSixDaysMm / 25.4 }
         $precipToday + $priorDisp
@@ -373,7 +679,6 @@ function Get-TempestDashboardPayload {
 
     $lat = if ($stationObj -and $null -ne $stationObj.latitude) { [double]$stationObj.latitude } elseif ($null -ne $forecastJson.latitude) { [double]$forecastJson.latitude } else { 0.0 }
     $lon = if ($stationObj -and $null -ne $stationObj.longitude) { [double]$stationObj.longitude } elseif ($null -ne $forecastJson.longitude) { [double]$forecastJson.longitude } else { 0.0 }
-    $tz = if ($stationObj -and $stationObj.timezone) { [string]$stationObj.timezone } elseif ($forecastJson.timezone) { [string]$forecastJson.timezone } else { 'UTC' }
 
     $dailyOut = @()
     foreach ($d in $dailyRaw) {
@@ -423,7 +728,8 @@ function Get-TempestDashboardPayload {
             temperature = $temp
             feelsLike = $feelsLike
             conditions = if ($cc.conditions) { [string]$cc.conditions } elseif ($todayFc -and $todayFc.conditions) { [string]$todayFc.conditions } else { 'Clear' }
-            summary = Build-NarrativeSummary -ForecastJson $forecastJson -Units $Units
+            summary = Build-NarrativeSummary -ForecastJson $forecastJson -Units $Units -Timezone $tz
+            forecastBriefing = Build-WeathermanBriefing -ForecastJson $forecastJson -Units $Units -Timezone $tz
             icon = if ($cc.icon) { [string]$cc.icon } elseif ($todayFc -and $todayFc.icon) { [string]$todayFc.icon } else { 'partly-cloudy-day' }
             todayLow = if ($todayFc -and $null -ne $todayFc.air_temp_low) { [double]$todayFc.air_temp_low } else { $temp - 8 }
             todayHigh = if ($todayFc -and $null -ne $todayFc.air_temp_high) { [double]$todayFc.air_temp_high } else { $temp + 8 }
@@ -443,9 +749,9 @@ function Get-TempestDashboardPayload {
             uv = $uv
             solarRadiation = $solar
             solarPeakToday = $solarPeakToday
-            lightningCount1hr = if ($null -ne $cc.lightning_strike_count_last_1hr) { [int]$cc.lightning_strike_count_last_1hr } else { 0 }
-            lightningLastDistance = $cc.lightning_strike_last_distance
-            lightningLastEpoch = $cc.lightning_strike_last_epoch
+            lightningCount1hr = if ($null -ne $cc.lightning_strike_count_last_1hr) { [int]$cc.lightning_strike_count_last_1hr } elseif ($latestObs -and $null -ne $latestObs.lightning_strike_count_last_1hr) { [int]$latestObs.lightning_strike_count_last_1hr } else { 0 }
+            lightningLastDistance = if ($null -ne $cc.lightning_strike_last_distance) { $cc.lightning_strike_last_distance } elseif ($latestObs -and $null -ne $latestObs.lightning_strike_last_distance) { if ($isMetric) { [double]$latestObs.lightning_strike_last_distance } else { [double]$latestObs.lightning_strike_last_distance * 0.621371 } } else { $null }
+            lightningLastEpoch = if ($null -ne $cc.lightning_strike_last_epoch) { $cc.lightning_strike_last_epoch } elseif ($latestObs -and $null -ne $latestObs.lightning_strike_last_epoch) { $latestObs.lightning_strike_last_epoch } else { $null }
         }
         astronomy = @{
             sunriseEpoch = if ($todayFc) { $todayFc.sunrise } else { $null }

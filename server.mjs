@@ -149,7 +149,86 @@ function degreesToCardinal(deg) {
   return dirs[idx];
 }
 
-function buildNarrativeSummary(forecastJson, units) {
+function getStationHour(timezone) {
+  try {
+    const h = Number(
+      new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: timezone || undefined }).format(new Date())
+    );
+    return Number.isNaN(h) ? new Date().getHours() : h % 24;
+  } catch {
+    return new Date().getHours();
+  }
+}
+
+function getLocalMidnightEpoch(nowSec, timezone) {
+  function getHms(ep) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone || undefined,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      }).formatToParts(new Date(ep * 1000));
+      const map = {};
+      for (const p of parts) map[p.type] = p.value;
+      return { h: Number(map.hour) % 24, m: Number(map.minute), s: Number(map.second) };
+    } catch {
+      const d = new Date(ep * 1000);
+      return { h: d.getHours(), m: d.getMinutes(), s: d.getSeconds() };
+    }
+  }
+  const p = getHms(nowSec);
+  let guess = nowSec - (p.h * 3600 + p.m * 60 + p.s);
+  const chk = getHms(guess);
+  if (chk.h === 23) guess += 3600;
+  else if (chk.h === 1) guess -= 3600;
+  return guess;
+}
+
+function formatHourBucket(epochSec, timezone) {
+  try {
+    return new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: true, timeZone: timezone || undefined }).format(
+      new Date(epochSec * 1000)
+    );
+  } catch {
+    const h = new Date(epochSec * 1000).getHours();
+    return `${h % 12 || 12} ${h >= 12 ? 'PM' : 'AM'}`;
+  }
+}
+
+function getLocalDateKey(epochSec, timezone) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: timezone || undefined,
+    }).format(new Date(epochSec * 1000));
+  } catch {
+    const d = new Date(epochSec * 1000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+}
+
+function skyPhrase(cond, isNight) {
+  const c = String(cond || '').toLowerCase();
+  if (c.includes('thunder')) return 'stormy skies with thunderstorms in the area';
+  if (c.includes('snow') || c.includes('sleet') || c.includes('wintry')) return 'wintry precipitation moving through';
+  if (c.includes('rain') || c.includes('shower')) {
+    return c.includes('possible') || c.includes('light')
+      ? 'scattered showers in the area'
+      : 'wet weather with rain moving through';
+  }
+  if (c.includes('fog')) return 'patchy fog and low clouds';
+  if (c.includes('partly')) return isNight ? 'partly cloudy skies' : 'a mix of sun and clouds';
+  if (c.includes('cloud')) return 'mostly cloudy skies';
+  if (c.includes('wind')) return 'breezy conditions';
+  if (c.includes('clear') || c.includes('sun')) return isNight ? 'clear, starlit skies' : 'bright, sunny skies';
+  return c ? `${c} conditions` : 'fair skies';
+}
+
+function buildNarrativeSummary(forecastJson, units, timezone) {
   const cc = forecastJson?.current_conditions || {};
   const today = forecastJson?.forecast?.daily?.[0];
   const hourly = forecastJson?.forecast?.hourly || [];
@@ -159,7 +238,7 @@ function buildNarrativeSummary(forecastJson, units) {
   const cond = cc.conditions || today?.conditions || 'Clear';
   const parts = [/skies|likely|possible|showers|storms|rain|snow/i.test(cond) ? `${cond}.` : `${cond} skies.`];
 
-  const hr = new Date().getHours();
+  const hr = getStationHour(timezone);
   if (today) {
     if (hr >= 16 || hr < 5) {
       if (typeof today.air_temp_low === 'number') parts.push(`Low ${Math.round(today.air_temp_low)}${tempUnit}.`);
@@ -180,6 +259,207 @@ function buildNarrativeSummary(forecastJson, units) {
     parts.push(`Winds ${dir} at ${Math.round(cc.wind_avg)} ${windUnit}.`);
   }
   return parts.join(' ');
+}
+
+function buildWeathermanBriefing(forecastJson, units, timezone) {
+  const cc = forecastJson?.current_conditions || {};
+  const daily = forecastJson?.forecast?.daily || [];
+  const today = daily[0] || null;
+  const tomorrow = daily[1] || null;
+  const hourly = forecastJson?.forecast?.hourly || [];
+  const isMetric = units === 'metric';
+  const tu = isMetric ? '°C' : '°F';
+  const wu = isMetric ? 'km/h' : 'mph';
+  const hr = getStationHour(timezone);
+  const isNight = hr >= 18 || hr < 6;
+  const cond = cc.conditions || today?.conditions || 'Clear';
+  const sky = skyPhrase(cond, isNight);
+
+  const hi = typeof today?.air_temp_high === 'number' ? Math.round(today.air_temp_high) : null;
+  const lo = typeof today?.air_temp_low === 'number' ? Math.round(today.air_temp_low) : null;
+  const hiF = hi !== null ? (isMetric ? (hi * 9) / 5 + 32 : hi) : 65;
+  const comfort = hiF >= 88 ? 'hot ' : hiF >= 77 ? 'warm ' : hiF >= 64 ? 'mild ' : hiF >= 52 ? 'cool ' : 'chilly ';
+
+  let lead = '';
+  if (hr >= 5 && hr < 12) {
+    lead = `Good morning! Expect ${sky} today${hi !== null ? ` with ${comfort}highs climbing near ${hi}${tu}` : ''}${lo !== null ? ` before dipping to ${lo}${tu} tonight.` : '.'}`;
+  } else if (hr >= 12 && hr < 17) {
+    lead = `This afternoon brings ${sky}${hi !== null ? `, with temperatures topping out near ${hi}${tu}` : ''}${lo !== null ? ` before cooling to around ${lo}${tu} tonight.` : '.'}`;
+  } else if (hr >= 17 && hr < 21) {
+    lead = `Good evening! Expect ${sky} tonight${lo !== null ? ` as temperatures settle toward an overnight low near ${lo}${tu}.` : '.'}`;
+  } else {
+    lead = `Tonight brings ${sky}${lo !== null ? ` with temperatures dipping toward an overnight low near ${lo}${tu}.` : '.'}`;
+  }
+
+  const pop = typeof today?.precip_probability === 'number' ? Math.round(today.precip_probability) : 0;
+  const next12 = hourly.slice(0, 12);
+  let peakPopH = null;
+  for (const h of next12) {
+    if (typeof h.precip_probability === 'number') {
+      if (!peakPopH || h.precip_probability > peakPopH.precip_probability) peakPopH = h;
+    }
+  }
+  let precipPhrase = 'Dry conditions hold steady';
+  if (pop >= 60) {
+    const peakWhen = peakPopH?.time && peakPopH.precip_probability >= 50 ? ` around ${formatHourBucket(peakPopH.time, timezone)}` : '';
+    precipPhrase = `Keep the umbrella handy with rain likely (${pop}% chance${peakWhen})`;
+  } else if (pop >= 30) {
+    precipPhrase = `Watch for a ${pop}% chance of passing showers`;
+  }
+
+  const nextWind = hourly.slice(0, 6).filter((h) => typeof h.wind_avg === 'number');
+  let windPhrase = '.';
+  if (nextWind.length >= 2) {
+    const speeds = nextWind.map((h) => h.wind_avg);
+    const minW = Math.max(0, Math.round(Math.min(...speeds)));
+    const maxW = Math.max(minW + 2, Math.round(Math.max(...speeds)));
+    const maxWMph = isMetric ? maxW / 1.60934 : maxW;
+    const dir = nextWind[0].wind_direction_cardinal || cc.wind_direction_cardinal || degreesToCardinal(cc.wind_direction);
+    windPhrase =
+      maxWMph >= 18
+        ? ` alongside gusty ${dir} winds at ${minW} to ${maxW} ${wu}.`
+        : maxWMph >= 9
+          ? ` with a ${dir} breeze at ${minW} to ${maxW} ${wu}.`
+          : ` with light ${dir} winds at ${minW} to ${maxW} ${wu}.`;
+  }
+
+  let extra = '';
+  if ((hr >= 17 || hr < 5) && typeof tomorrow?.air_temp_high === 'number') {
+    const tomPop = typeof tomorrow.precip_probability === 'number' ? Math.round(tomorrow.precip_probability) : 0;
+    const tomOutlook = tomPop >= 50 ? `brings a ${tomPop}% chance of rain` : `brings ${skyPhrase(tomorrow.conditions, false)}`;
+    extra = ` Tomorrow ${tomOutlook} with a high near ${Math.round(tomorrow.air_temp_high)}${tu}.`;
+  } else if (!isNight && typeof cc.uv === 'number' && cc.uv >= 6) {
+    extra = ' Grab sunglasses and SPF with high UV today.';
+  }
+
+  return `${lead} ${precipPhrase}${windPhrase}${extra}`;
+}
+
+function sumPriorSixDaysPrecipMm(obsPayloads, startEpoch, endEpoch, timezone, precipYesterdayMm) {
+  const days = new Map();
+  const seenEpochs = new Set();
+  let gotValid = false;
+
+  for (const data of obsPayloads) {
+    if (!data || !Array.isArray(data.obs)) continue;
+    if (data.type !== 'obs_st' && data.type !== 'obs_sky') continue;
+    gotValid = true;
+    const isSky = data.type === 'obs_sky';
+    for (const r of data.obs) {
+      if (!r || typeof r[0] !== 'number') continue;
+      if (r[0] < startEpoch || r[0] >= endEpoch) continue;
+      if (seenEpochs.has(r[0])) continue;
+      seenEpochs.add(r[0]);
+      const dayKey = getLocalDateKey(r[0], timezone);
+      if (!days.has(dayKey)) {
+        days.set(dayKey, { sumRaw: 0, maxRaw: 0, sumNc: 0, maxNc: 0, useNc: false });
+      }
+      const b = days.get(dayKey);
+      const rawInt = isSky ? (typeof r[3] === 'number' ? r[3] : 0) : (typeof r[12] === 'number' ? r[12] : 0);
+      const rawDay = isSky ? (typeof r[11] === 'number' ? r[11] : 0) : (typeof r[18] === 'number' ? r[18] : 0);
+      const ncInt = isSky ? (typeof r[14] === 'number' ? r[14] : null) : (typeof r[19] === 'number' ? r[19] : null);
+      const ncDay = isSky ? (typeof r[15] === 'number' ? r[15] : null) : (typeof r[20] === 'number' ? r[20] : null);
+      const aType = isSky ? r[16] : r[21];
+
+      b.sumRaw += rawInt;
+      if (rawDay > b.maxRaw) b.maxRaw = rawDay;
+      if (ncInt !== null) b.sumNc += ncInt;
+      if (ncDay !== null && ncDay > b.maxNc) b.maxNc = ncDay;
+      if (aType === 1 && (ncInt !== null || ncDay !== null)) b.useNc = true;
+    }
+  }
+
+  if (!gotValid) return null;
+
+  const yestKey = getLocalDateKey(endEpoch - 43200, timezone);
+  let totalMm = 0;
+  for (const [key, d] of days.entries()) {
+    let dayMm = d.useNc ? Math.max(d.sumNc, d.maxNc) : Math.max(d.sumRaw, d.maxRaw);
+    if (key === yestKey && typeof precipYesterdayMm === 'number' && precipYesterdayMm > dayMm) {
+      dayMm = precipYesterdayMm;
+    }
+    totalMm += dayMm;
+  }
+  if (!days.has(yestKey) && typeof precipYesterdayMm === 'number' && precipYesterdayMm > 0) {
+    totalMm += precipYesterdayMm;
+  }
+  return totalMm;
+}
+
+function resolveStationObj(stationJson, stationId) {
+  const list = stationJson?.stations || stationJson?.locations || [];
+  return list.find((s) => String(s?.station_id ?? s?.location_id ?? '') === String(stationId)) || list[0] || {};
+}
+
+function collectCandidateDeviceIds(obsJson, devices) {
+  const seen = new Set();
+  const out = [];
+  const add = (id) => {
+    if (!id || seen.has(String(id))) return;
+    seen.add(String(id));
+    out.push(id);
+  };
+  if (obsJson?.device_id) add(obsJson.device_id);
+  for (const d of devices) if (d.device_type === 'ST' && d.serial_number) add(d.device_id);
+  for (const d of devices) if (d.device_type === 'SK' && d.serial_number) add(d.device_id);
+  for (const d of devices) if (d.device_type === 'ST' || d.device_type === 'SK') add(d.device_id);
+  return out;
+}
+
+function parseTodayObs(todayObs, localDayStart, isMetric) {
+  if (!todayObs || (todayObs.type !== 'obs_st' && todayObs.type !== 'obs_sky') || !Array.isArray(todayObs.obs) || todayObs.obs.length === 0) {
+    return null;
+  }
+  const isSky = todayObs.type === 'obs_sky';
+  const rows = [...todayObs.obs].sort((a, b) => (Number(a?.[0]) || 0) - (Number(b?.[0]) || 0));
+  const gustIdx = isSky ? 6 : 3;
+  const solarIdx = isSky ? 10 : 11;
+  const rainIdx = isSky ? 3 : 12;
+
+  const todayRows = rows.filter((r) => r && typeof r[0] === 'number' && r[0] >= localDayStart);
+  let windPeakToday = null;
+  let solarPeakToday = null;
+  let precipRate = 0;
+
+  if (todayRows.length > 0) {
+    let maxGustMps = 0;
+    let maxSolar = 0;
+    for (const r of todayRows) {
+      if (typeof r[gustIdx] === 'number' && r[gustIdx] > maxGustMps) maxGustMps = r[gustIdx];
+      if (typeof r[solarIdx] === 'number' && r[solarIdx] > maxSolar) maxSolar = r[solarIdx];
+    }
+    windPeakToday = isMetric ? maxGustMps * 3.6 : maxGustMps * 2.23694;
+    solarPeakToday = maxSolar;
+
+    const tail = todayRows.slice(-5);
+    const rainSumMm = tail.reduce((acc, r) => acc + (typeof r[rainIdx] === 'number' ? r[rainIdx] : 0), 0);
+    const rateMmHr = (rainSumMm / tail.length) * 60;
+    precipRate = isMetric ? rateMmHr : rateMmHr / 25.4;
+  }
+
+  let pressureChange3hr = null;
+  if (!isSky) {
+    const latest = rows[rows.length - 1];
+    if (latest && typeof latest[6] === 'number') {
+      const targetEpoch = latest[0] - 10800;
+      let best = null;
+      let bestDiff = Infinity;
+      for (const r of rows) {
+        if (!r || typeof r[6] !== 'number') continue;
+        const diff = Math.abs(r[0] - targetEpoch);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          best = r;
+        }
+      }
+      if (best && bestDiff < 5400) {
+        const deltaMb = latest[6] - best[6];
+        pressureChange3hr = isMetric ? Number(deltaMb.toFixed(1)) : Number((deltaMb * 0.029529983).toFixed(2));
+      }
+    }
+  }
+
+  return { windPeakToday, solarPeakToday, pressureChange3hr, precipRate };
 }
 
 async function fetchJson(url) {
@@ -214,10 +494,43 @@ async function buildDashboardPayload({ stationId, token, units }) {
     fetchMorroBayTides(units),
   ]);
 
-  const stationObj = stationJson?.stations?.[0] || {};
+  let stationObj = resolveStationObj(stationJson, stationId);
+  if (!Array.isArray(stationObj.devices) || stationObj.devices.length === 0) {
+    const allSt = await fetchJson(`${TEMPEST_BASE}/stations?token=${encodeURIComponent(token)}`).catch(() => null);
+    if (allSt) stationObj = resolveStationObj(allSt, stationId);
+  }
   const devices = stationObj.devices || [];
-  const primaryDev = devices.find((d) => d.device_type === 'ST') || devices.find((d) => d.device_type === 'SK') || null;
-  const deviceId = primaryDev?.device_id || obsJson?.device_id || null;
+  const candidateDeviceIds = collectCandidateDeviceIds(obsJson, devices);
+  let deviceId = candidateDeviceIds[0] || null;
+  const stationTz = stationObj.timezone || forecastJson?.timezone || 'UTC';
+
+  const cc = forecastJson?.current_conditions || {};
+  const latestObs = obsJson?.obs?.[0] || {};
+  const dailyRaw = forecastJson?.forecast?.daily || [];
+  const todayFc = dailyRaw[0] || {};
+
+  const precipToday =
+    cc.precip_accum_local_day ??
+    (typeof latestObs.precip_accum_local_day_final === 'number'
+      ? (isMetric ? latestObs.precip_accum_local_day_final : latestObs.precip_accum_local_day_final / 25.4)
+      : typeof latestObs.precip_accum_local_day === 'number'
+        ? (isMetric ? latestObs.precip_accum_local_day : latestObs.precip_accum_local_day / 25.4)
+        : 0);
+  const precipYesterday =
+    cc.precip_accum_local_yesterday ??
+    (typeof latestObs.precip_accum_local_yesterday_final === 'number'
+      ? (isMetric ? latestObs.precip_accum_local_yesterday_final : latestObs.precip_accum_local_yesterday_final / 25.4)
+      : typeof latestObs.precip_accum_local_yesterday === 'number'
+        ? (isMetric ? latestObs.precip_accum_local_yesterday : latestObs.precip_accum_local_yesterday / 25.4)
+        : 0);
+  const precipYestMm =
+    typeof latestObs.precip_accum_local_yesterday_final === 'number'
+      ? latestObs.precip_accum_local_yesterday_final
+      : typeof latestObs.precip_accum_local_yesterday === 'number'
+        ? latestObs.precip_accum_local_yesterday
+        : isMetric
+          ? precipYesterday
+          : precipYesterday * 25.4;
 
   let windPeakToday = null;
   let solarPeakToday = null;
@@ -226,81 +539,76 @@ async function buildDashboardPayload({ stationId, token, units }) {
   let priorSixDaysMm = 0;
   let hasPriorSixDays = false;
 
-  if (deviceId) {
-    try {
-      const todayObs = await fetchJson(
-        `${TEMPEST_BASE}/observations/device/${deviceId}?day_offset=0&token=${encodeURIComponent(token)}`
-      );
-      if (todayObs?.type === 'obs_st' && Array.isArray(todayObs.obs) && todayObs.obs.length > 0) {
-        const rows = todayObs.obs;
-        let maxGustMps = 0;
-        let maxSolar = 0;
-        for (const r of rows) {
-          if (typeof r[3] === 'number' && r[3] > maxGustMps) maxGustMps = r[3];
-          if (typeof r[11] === 'number' && r[11] > maxSolar) maxSolar = r[11];
-        }
-        windPeakToday = isMetric ? maxGustMps * 3.6 : maxGustMps * 2.23694;
-        solarPeakToday = maxSolar;
+  if (candidateDeviceIds.length > 0) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const localDayStart = getLocalMidnightEpoch(nowSec, stationTz);
+    const todayFetchStart = Math.min(localDayStart, nowSec - 14400);
 
-        const latest = rows[rows.length - 1];
-        if (typeof latest[6] === 'number') {
-          const targetEpoch = latest[0] - 10800;
-          let best = null;
-          let bestDiff = Infinity;
-          for (const r of rows) {
-            if (typeof r[6] !== 'number') continue;
-            const diff = Math.abs(r[0] - targetEpoch);
-            if (diff < bestDiff) {
-              bestDiff = diff;
-              best = r;
-            }
-          }
-          if (best && bestDiff < 5400) {
-            const deltaMb = latest[6] - best[6];
-            pressureChange3hr = isMetric ? Number(deltaMb.toFixed(1)) : Number((deltaMb * 0.029529983).toFixed(2));
-          }
-        }
-
-        const tail = rows.slice(-5);
-        const rainSumMm = tail.reduce((acc, r) => acc + (typeof r[12] === 'number' ? r[12] : 0), 0);
-        const rateMmHr = (rainSumMm / tail.length) * 60;
-        precipRate = isMetric ? rateMmHr : rateMmHr / 25.4;
+    for (const candId of candidateDeviceIds) {
+      let parsed = null;
+      try {
+        const todayObs = await fetchJson(
+          `${TEMPEST_BASE}/observations/device/${candId}?time_start=${todayFetchStart}&time_end=${nowSec}&token=${encodeURIComponent(token)}`
+        );
+        parsed = parseTodayObs(todayObs, localDayStart, isMetric);
+      } catch {}
+      if (!parsed) {
+        try {
+          const td0 = await fetchJson(
+            `${TEMPEST_BASE}/observations/device/${candId}?day_offset=0&token=${encodeURIComponent(token)}`
+          );
+          parsed = parseTodayObs(td0, localDayStart, isMetric);
+        } catch {}
       }
-    } catch {
-      // Optional enrichment
+      if (parsed) {
+        deviceId = candId;
+        windPeakToday = parsed.windPeakToday;
+        solarPeakToday = parsed.solarPeakToday;
+        pressureChange3hr = parsed.pressureChange3hr;
+        precipRate = parsed.precipRate;
+        break;
+      }
     }
 
-    const cached = sevenDayCache.get(String(deviceId));
-    if (cached && Date.now() - cached.ts < 30 * 60 * 1000) {
-      priorSixDaysMm = cached.mm;
-      hasPriorSixDays = true;
-    } else {
-      try {
-        const dayPromises = [1, 2, 3, 4, 5, 6].map((d) =>
-          fetchJson(`${TEMPEST_BASE}/observations/device/${deviceId}?day_offset=${d}&token=${encodeURIComponent(token)}`).catch(() => null)
-        );
-        const results = await Promise.all(dayPromises);
-        let sum = 0;
-        for (const res of results) {
-          if (res?.type === 'obs_st' && Array.isArray(res.obs)) {
-            for (const r of res.obs) {
-              if (typeof r[12] === 'number') sum += r[12];
+    if (deviceId) {
+      const cacheKey = `${deviceId}_${localDayStart}`;
+      const cached = sevenDayCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < 30 * 60 * 1000) {
+        priorSixDaysMm = cached.mm;
+        hasPriorSixDays = true;
+      } else {
+        try {
+          const start6d = localDayStart - 6 * 86400;
+          const mid3d = localDayStart - 3 * 86400;
+          const payloads = await Promise.all([
+            fetchJson(`${TEMPEST_BASE}/observations/device/${deviceId}?time_start=${start6d}&time_end=${mid3d - 1}&token=${encodeURIComponent(token)}`).catch(() => null),
+            fetchJson(`${TEMPEST_BASE}/observations/device/${deviceId}?time_start=${mid3d}&time_end=${localDayStart - 1}&token=${encodeURIComponent(token)}`).catch(() => null),
+          ]);
+          let validPayloads = payloads.filter(Boolean);
+          let isComplete = validPayloads.length === 2;
+          if (validPayloads.length === 0) {
+            const fb = await Promise.all(
+              [1, 2, 3, 4, 5, 6].map((dOff) =>
+                fetchJson(`${TEMPEST_BASE}/observations/device/${deviceId}?day_offset=${dOff}&token=${encodeURIComponent(token)}`).catch(() => null)
+              )
+            );
+            validPayloads = fb.filter(Boolean);
+            isComplete = validPayloads.length >= 5;
+          }
+          const sumMm = sumPriorSixDaysPrecipMm(validPayloads, start6d, localDayStart, stationTz, precipYestMm);
+          if (sumMm !== null) {
+            priorSixDaysMm = sumMm;
+            hasPriorSixDays = true;
+            if (isComplete) {
+              sevenDayCache.set(cacheKey, { ts: Date.now(), mm: sumMm });
             }
           }
+        } catch {
+          // Optional enrichment
         }
-        priorSixDaysMm = sum;
-        hasPriorSixDays = true;
-        sevenDayCache.set(String(deviceId), { ts: Date.now(), mm: sum });
-      } catch {
-        // Optional enrichment
       }
     }
   }
-
-  const cc = forecastJson?.current_conditions || {};
-  const latestObs = obsJson?.obs?.[0] || {};
-  const dailyRaw = forecastJson?.forecast?.daily || [];
-  const todayFc = dailyRaw[0] || {};
 
   const elevMeters = stationObj?.station_meta?.elevation ?? obsJson?.elevation ?? 0;
   const elevation = isMetric ? Math.round(elevMeters) : Math.round(elevMeters * 3.28084);
@@ -308,11 +616,16 @@ async function buildDashboardPayload({ stationId, token, units }) {
   const temp = cc.air_temperature ?? 0;
   const windGust = cc.wind_gust ?? cc.wind_avg ?? 0;
   const solar = cc.solar_radiation ?? 0;
-  const precipToday = cc.precip_accum_local_day ?? 0;
-  const precipYesterday = cc.precip_accum_local_yesterday ?? 0;
   const precip7Day = hasPriorSixDays
     ? precipToday + (isMetric ? priorSixDaysMm : priorSixDaysMm / 25.4)
     : precipToday + precipYesterday;
+  const lightningCount1hr = cc.lightning_strike_count_last_1hr ?? latestObs.lightning_strike_count_last_1hr ?? 0;
+  const lightningLastEpoch = cc.lightning_strike_last_epoch ?? latestObs.lightning_strike_last_epoch ?? null;
+  const lightningLastDistance =
+    cc.lightning_strike_last_distance ??
+    (typeof latestObs.lightning_strike_last_distance === 'number'
+      ? (isMetric ? latestObs.lightning_strike_last_distance : latestObs.lightning_strike_last_distance * 0.621371)
+      : null);
 
   return {
     isDemo: false,
@@ -326,14 +639,15 @@ async function buildDashboardPayload({ stationId, token, units }) {
       elevationUnit: isMetric ? 'm' : 'ft',
       latitude: stationObj.latitude ?? forecastJson?.latitude ?? 0,
       longitude: stationObj.longitude ?? forecastJson?.longitude ?? 0,
-      timezone: stationObj.timezone || forecastJson?.timezone || 'UTC',
+      timezone: stationTz,
     },
     current: {
       epoch: latestObs.timestamp || cc.time || Math.floor(Date.now() / 1000),
       temperature: temp,
       feelsLike: cc.feels_like ?? temp,
       conditions: cc.conditions || todayFc.conditions || 'Clear',
-      summary: buildNarrativeSummary(forecastJson, units),
+      summary: buildNarrativeSummary(forecastJson, units, stationTz),
+      forecastBriefing: buildWeathermanBriefing(forecastJson, units, stationTz),
       icon: cc.icon || todayFc.icon || 'partly-cloudy-day',
       todayLow: todayFc.air_temp_low ?? temp - 8,
       todayHigh: todayFc.air_temp_high ?? temp + 8,
@@ -353,9 +667,9 @@ async function buildDashboardPayload({ stationId, token, units }) {
       uv: cc.uv ?? 0,
       solarRadiation: solar,
       solarPeakToday: Math.max(solar, solarPeakToday ?? solar),
-      lightningCount1hr: cc.lightning_strike_count_last_1hr ?? 0,
-      lightningLastDistance: cc.lightning_strike_last_distance ?? null,
-      lightningLastEpoch: cc.lightning_strike_last_epoch ?? null,
+      lightningCount1hr,
+      lightningLastDistance,
+      lightningLastEpoch,
     },
     astronomy: {
       sunriseEpoch: todayFc.sunrise || null,

@@ -311,11 +311,51 @@ body {
   width: 100%;
   max-width: 1640px;
   margin: 0 auto;
-  padding: 18px 26px 18px;
+  padding: 16px 26px 18px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  gap: 15px;
+}
+
+/* Broadcast Weatherman Briefing Card */
+.briefing-card {
+  background: linear-gradient(90deg, rgba(96, 174, 255, 0.09) 0%, rgba(26, 27, 30, 0.96) 45%);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: 8px;
+  padding: 11px 18px;
+  display: flex;
+  align-items: center;
   gap: 16px;
+}
+
+.briefing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  color: #7cc4ec;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.briefing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.75);
+}
+
+.briefing-text {
+  font-size: 14px;
+  line-height: 1.48;
+  color: #e4e8ef;
+  min-width: 0;
 }
 
 /* Upper Grid: Hero Left + 3x2 Cards Right */
@@ -1234,6 +1274,12 @@ body {
 
   .dashboard-main {
     padding: 14px 16px;
+  }
+
+  .briefing-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
 
   .metrics-grid {
