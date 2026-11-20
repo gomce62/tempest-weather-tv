@@ -1410,13 +1410,16 @@ body {
 }
 
 .avatar-svg {
+  position: relative;
   width: 100%;
   height: 100%;
   display: block;
 }
 
 .avatar-svg .av-head {
-  transform-origin: 140px 210px;
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 75%;
   transition: transform 0.25s ease;
 }
 
@@ -1431,6 +1434,18 @@ body {
   80% { transform: scale(1.016) translateY(-1px) rotate(-0.25deg); }
 }
 
+.avatar-base-img,
+.avatar-mouth-canvas,
+.avatar-eyelids-svg,
+.avatar-card-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
 .avatar-svg .av-eyelids {
   transform-origin: 144px 92px;
   transform: scaleY(0);
@@ -1442,13 +1457,6 @@ body {
   transform: scaleY(1);
   opacity: 1;
 }
-
-.avatar-svg .av-mouth { display: none; }
-.avatar-svg[data-mouth="rest"] .av-mouth-rest { display: inline; }
-.avatar-svg[data-mouth="small"] .av-mouth-small { display: inline; }
-.avatar-svg[data-mouth="medium"] .av-mouth-medium { display: inline; }
-.avatar-svg[data-mouth="wide"] .av-mouth-wide { display: inline; }
-.avatar-svg[data-mouth="round"] .av-mouth-round { display: inline; }
 
 .avatar-copy-col {
   display: flex;
