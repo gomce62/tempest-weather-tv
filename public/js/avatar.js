@@ -859,33 +859,40 @@ export class WeatherAvatarController {
     if (!('speechSynthesis' in window)) return null;
     const voices = window.speechSynthesis.getVoices() || [];
     if (!voices.length) return null;
-    const malePattern = /\b(male|david|mark|guy|daniel|alex|fred|aaron|arthur|ryan|andrew|brian|christopher|eric|steffan|george|james|richard|rishi|oliver|thomas|albert|bruce|ralph)\b/i;
-    const preferred = [
-      'microsoft aria',
-      'microsoft jenny',
-      'microsoft ava',
-      'microsoft emma',
-      'google us english',
-      'samantha',
-      'ava',
-      'allison',
-      'victoria',
-      'serena',
-      'karen',
-      'tessa',
-      'moira',
-      'zira',
-      'female',
+    const malePattern = /\b(male|david|mark|guy|daniel|alex|fred|aaron|arthur|ryan|andrew|brian|christopher|eric|steffan|george|james|richard|rishi|oliver|thomas|albert|bruce|ralph|iol|iom|tpd)\b/i;
+    const isFemaleSafe = (v) => !malePattern.test(v.name || '');
+    const isEnUs = (v) => /^en[-_]US(?:$|[-_])/i.test(v.lang || '');
+    const isEn = (v) => /^en(?:$|[-_])/i.test(v.lang || '');
+
+    const usFemalePrefs = [
+      /\bmicrosoft aria\b/i,
+      /\bmicrosoft jenny\b/i,
+      /\bmicrosoft ava\b/i,
+      /\bmicrosoft emma\b/i,
+      /\bgoogle us english\b/i,
+      /\bsamantha\b/i,
+      /\bava\b/i,
+      /\ballison\b/i,
+      /\bvictoria\b/i,
+      /\bzira\b/i,
+      /\b(female|woman)\b/i,
     ];
-    for (const name of preferred) {
-      const match = voices.find((v) => v.name.toLowerCase().includes(name) && !malePattern.test(v.name));
+    const enUsVoices = voices.filter((v) => isEnUs(v) && isFemaleSafe(v));
+    for (const pat of usFemalePrefs) {
+      const match = enUsVoices.find((v) => pat.test(v.name || ''));
       if (match) return match;
     }
-    return (
-      voices.find((v) => /^en[-_]US/i.test(v.lang) && !malePattern.test(v.name)) ||
-      voices.find((v) => /^en/i.test(v.lang) && !malePattern.test(v.name)) ||
-      null
-    );
+    if (enUsVoices.length) {
+      return enUsVoices.find((v) => v.default) || enUsVoices[0];
+    }
+
+    const enVoices = voices.filter((v) => isEn(v) && isFemaleSafe(v));
+    const otherEnPrefs = [/\bkaren\b/i, /\bserena\b/i, /\btessa\b/i, /\bmoira\b/i, /\b(female|woman)\b/i];
+    for (const pat of otherEnPrefs) {
+      const match = enVoices.find((v) => pat.test(v.name || ''));
+      if (match) return match;
+    }
+    return enVoices.find((v) => v.default) || enVoices[0] || null;
   }
 
   async speak() {

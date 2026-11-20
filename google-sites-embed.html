@@ -2278,13 +2278,28 @@
         if (!('speechSynthesis' in window)) return null;
         const voices = window.speechSynthesis.getVoices() || [];
         if (!voices.length) return null;
-        const malePat = /\b(male|david|mark|guy|daniel|alex|fred|aaron|arthur|ryan|andrew|brian|christopher|eric|steffan|george|james|richard|rishi|oliver|thomas|albert|bruce|ralph)\b/i;
-        const pref = ['microsoft aria', 'microsoft jenny', 'microsoft ava', 'microsoft emma', 'google us english', 'samantha', 'ava', 'allison', 'victoria', 'serena', 'karen', 'tessa', 'moira', 'zira', 'female'];
-        for (const p of pref) {
-          const match = voices.find((x) => x.name.toLowerCase().includes(p) && !malePat.test(x.name));
+        const malePat = /\b(male|david|mark|guy|daniel|alex|fred|aaron|arthur|ryan|andrew|brian|christopher|eric|steffan|george|james|richard|rishi|oliver|thomas|albert|bruce|ralph|iol|iom|tpd)\b/i;
+        const isFemaleSafe = (v) => !malePat.test(v.name || '');
+        const isEnUs = (v) => /^en[-_]US(?:$|[-_])/i.test(v.lang || '');
+        const isEn = (v) => /^en(?:$|[-_])/i.test(v.lang || '');
+        const usPrefs = [
+          /\bmicrosoft aria\b/i, /\bmicrosoft jenny\b/i, /\bmicrosoft ava\b/i, /\bmicrosoft emma\b/i,
+          /\bgoogle us english\b/i, /\bsamantha\b/i, /\bava\b/i, /\ballison\b/i,
+          /\bvictoria\b/i, /\bzira\b/i, /\b(female|woman)\b/i,
+        ];
+        const enUsVoices = voices.filter((v) => isEnUs(v) && isFemaleSafe(v));
+        for (const pat of usPrefs) {
+          const match = enUsVoices.find((v) => pat.test(v.name || ''));
           if (match) return match;
         }
-        return voices.find((x) => /^en[-_]US/i.test(x.lang) && !malePat.test(x.name)) || voices.find((x) => /^en/i.test(x.lang) && !malePat.test(x.name)) || null;
+        if (enUsVoices.length) return enUsVoices.find((v) => v.default) || enUsVoices[0];
+        const enVoices = voices.filter((v) => isEn(v) && isFemaleSafe(v));
+        const otherPrefs = [/\bkaren\b/i, /\bserena\b/i, /\btessa\b/i, /\bmoira\b/i, /\b(female|woman)\b/i];
+        for (const pat of otherPrefs) {
+          const match = enVoices.find((v) => pat.test(v.name || ''));
+          if (match) return match;
+        }
+        return enVoices.find((v) => v.default) || enVoices[0] || null;
       },
       waitForFemaleVoice(timeoutMs) {
         return new Promise((resolve) => {
