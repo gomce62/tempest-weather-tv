@@ -213,17 +213,19 @@ export function buildIndieForecastFromDashboard(data, fallbackText = '') {
     leadParts.push(`Looking ahead, tomorrow brings ${tomSky}${tomRain} with a high near ${Math.round(tomorrow.high)}${tu}.`);
   }
 
+  leadParts.push('Here are the current detailed conditions on Alta Court along with a 10-day Forecast. I hope you have a great rest of your day.');
   return `${intro}${leadParts.join(' ')}`;
 }
 
 export function formatIndieForecastScript(rawText) {
   const clean = String(rawText || '').trim().replace(/\s+/g, ' ');
   const intro = "Hi, I'm Indie, your Morro Bay Alta Court weather girl. Today's forecast calls for ";
+  const outro = 'Here are the current detailed conditions on Alta Court along with a 10-day Forecast. I hope you have a great rest of your day.';
   if (!clean) {
-    return `${intro}mild coastal weather.`;
+    return `${intro}mild coastal weather. ${outro}`;
   }
   if (/^hi,\s*i['’]m indie/i.test(clean)) {
-    return clean;
+    return /great rest of your day/i.test(clean) ? clean : `${clean.replace(/\.?\s*$/, '.')} ${outro}`;
   }
   let body = clean
     .replace(/^Good morning!\s*Expect\s+/i, '')
@@ -233,7 +235,8 @@ export function formatIndieForecastScript(rawText) {
   if (/^[A-Z][a-z]/.test(body)) {
     body = body.charAt(0).toLowerCase() + body.slice(1);
   }
-  return `${intro}${body}`;
+  const withOutro = /great rest of your day/i.test(body) ? body : `${body.replace(/\.?\s*$/, '.')} ${outro}`;
+  return `${intro}${withOutro}`;
 }
 
 export function buildSpeechScript(displayText) {
@@ -267,19 +270,33 @@ const MOUTH_Y0 = 212;
 const MOUTH_W = 90;
 const MOUTH_H = 73;
 
-const DIGIT_SPEECH_WORDS = {
-  0: 'oh', 1: 'one', 2: 'two', 3: 'three', 4: 'four',
-  5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine',
-};
+const ONES_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const TENS_WORDS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+function numberToSpeechWords(numStr) {
+  const n = Number(numStr);
+  if (!Number.isFinite(n) || n < 0 || n >= 1000) {
+    return String(numStr).split('').map((d) => ONES_WORDS[Number(d)] || d).join(' ');
+  }
+  if (n < 20) return ONES_WORDS[n];
+  if (n < 100) {
+    const t = Math.floor(n / 10);
+    const r = n % 10;
+    return r ? `${TENS_WORDS[t]} ${ONES_WORDS[r]}` : TENS_WORDS[t];
+  }
+  const h = Math.floor(n / 100);
+  const rem = n % 100;
+  return rem ? `${ONES_WORDS[h]} hundred ${numberToSpeechWords(rem)}` : `${ONES_WORDS[h]} hundred`;
+}
 
 function wordToPhonemes(rawWord) {
   let w = String(rawWord || '').toLowerCase();
   const hasEndPause = /[.!?]$/.test(w);
   const hasCommaPause = /[,;:]$/.test(w);
-  w = w.replace(/\d/g, (d) => ` ${DIGIT_SPEECH_WORDS[d] || d} `).replace(/[^a-z\s]/g, '').trim();
+  w = w.replace(/\d+/g, (n) => ` ${numberToSpeechWords(n)} `).replace(/[^a-z\s]/g, '').trim();
   const out = [];
   if (!w) {
-    out.push({ open: 0.04, round: 0, ms: hasEndPause ? 280 : 140 });
+    out.push({ open: 0.04, round: 0, ms: hasEndPause ? 440 : 220 });
     return out;
   }
   let i = 0;
@@ -288,45 +305,45 @@ function wordToPhonemes(rawWord) {
     if (ch === ' ') { i += 1; continue; }
     const pair = w.slice(i, i + 2);
     if (pair === 'oo' || pair === 'ou' || pair === 'ow' || pair === 'oh') {
-      out.push({ open: 0.68, round: 0.90, ms: 105 });
+      out.push({ open: 0.68, round: 0.90, ms: 132 });
       i += 2;
     } else if (pair === 'ai' || pair === 'ay' || pair === 'ae') {
-      out.push({ open: 0.88, round: 0.0, ms: 105 });
+      out.push({ open: 0.88, round: 0.0, ms: 132 });
       i += 2;
     } else if (pair === 'ee' || pair === 'ea' || pair === 'ie' || pair === 'ey') {
-      out.push({ open: 0.54, round: 0.0, ms: 95 });
+      out.push({ open: 0.54, round: 0.0, ms: 120 });
       i += 2;
     } else if (ch === 'o') {
-      out.push({ open: 0.66, round: 0.86, ms: 100 });
+      out.push({ open: 0.66, round: 0.86, ms: 126 });
       i += 1;
     } else if (ch === 'a') {
-      out.push({ open: 0.90, round: 0.0, ms: 105 });
+      out.push({ open: 0.90, round: 0.0, ms: 132 });
       i += 1;
     } else if (ch === 'u') {
-      out.push({ open: 0.58, round: 0.45, ms: 95 });
+      out.push({ open: 0.58, round: 0.45, ms: 120 });
       i += 1;
     } else if (ch === 'e' || ch === 'i' || ch === 'y') {
-      out.push({ open: 0.50, round: 0.0, ms: 90 });
+      out.push({ open: 0.50, round: 0.0, ms: 112 });
       i += 1;
     } else if (ch === 'm' || ch === 'b' || ch === 'p') {
-      out.push({ open: 0.03, round: 0.04, ms: 55 });
+      out.push({ open: 0.03, round: 0.04, ms: 68 });
       i += 1;
     } else if (ch === 'w') {
-      out.push({ open: 0.34, round: 0.85, ms: 65 });
+      out.push({ open: 0.34, round: 0.85, ms: 82 });
       i += 1;
     } else if (ch === 'f' || ch === 'v') {
-      out.push({ open: 0.14, round: 0.0, ms: 55 });
+      out.push({ open: 0.14, round: 0.0, ms: 68 });
       i += 1;
     } else {
       if (!out.length || out[out.length - 1].open > 0.30) {
-        out.push({ open: 0.22, round: 0.08, ms: 50 });
+        out.push({ open: 0.22, round: 0.08, ms: 64 });
       }
       i += 1;
     }
   }
-  if (!out.length) out.push({ open: 0.38, round: 0.1, ms: 95 });
-  if (hasEndPause) out.push({ open: 0.02, round: 0.0, ms: 290 });
-  else if (hasCommaPause) out.push({ open: 0.04, round: 0.0, ms: 165 });
+  if (!out.length) out.push({ open: 0.38, round: 0.1, ms: 115 });
+  if (hasEndPause) out.push({ open: 0.02, round: 0.0, ms: 440 });
+  else if (hasCommaPause) out.push({ open: 0.04, round: 0.0, ms: 250 });
   return out;
 }
 
@@ -359,7 +376,7 @@ const indieMouthEngine = {
       this.img.src = INDIE_PORTRAIT_DATA_URI;
     }
   },
-  bindCanvas(canvas, openAmt = 0, roundAmt = 0) {
+  bindCanvas(canvas, openAmt = 0, roundAmt = 0, smileAmt = 0) {
     if (!canvas) return;
     this.warmup();
     const drawBase = () => {
@@ -367,7 +384,7 @@ const indieMouthEngine = {
         const ctx = canvas.getContext('2d');
         if (!ctx || !this.img) return;
         ctx.drawImage(this.img, 0, 0, 480, 480);
-        if (openAmt > 0.004) this.render(canvas, openAmt, roundAmt);
+        if (openAmt > 0.004 || smileAmt > 0.004) this.render(canvas, openAmt, roundAmt, smileAmt);
       } catch {}
     };
     if (this.ready) {
@@ -376,11 +393,11 @@ const indieMouthEngine = {
       this.loadCallbacks.push(drawBase);
     }
   },
-  render(canvas, openAmt, roundAmt) {
+  render(canvas, openAmt, roundAmt, smileAmt = 0) {
     if (!this.ready || !canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    if (openAmt <= 0.004) {
+    if (openAmt <= 0.004 && smileAmt <= 0.004) {
       ctx.putImageData(this.restImgData, MOUTH_X0, MOUTH_Y0);
       return;
     }
@@ -395,6 +412,7 @@ const indieMouthEngine = {
     const tHw = halfW * 0.72;
     const cx = 142.2;
     const openFeather = Math.min(1, openAmt * 6.0);
+    const hasOpen = openAmt > 0.004;
 
     for (let px = 0; px < MOUTH_W; px++) {
       const x280 = (MOUTH_X0 + px) / MOUTH_SCALE;
@@ -412,6 +430,12 @@ const indieMouthEngine = {
       const lowerLim = sy + dropX;
       const gap = Math.max(1e-4, lowerLim - upperLim);
       const colPuck = roundAmt * openAmt * 2.8 * Math.sin(Math.PI * u) * (1 - u * u);
+      const au = Math.abs(u);
+      const smLobe = smileAmt > 0.004
+        ? Math.exp(-Math.pow((au - 0.72) / 0.24, 2)) * Math.max(0, 1 - Math.pow(Math.max(0, (au - 0.65) / 0.35), 2))
+        : 0;
+      const cornerLift = smileAmt * 2.1 * smLobe;
+      const cornerPull = smileAmt * 1.15 * smLobe * (u > 0 ? -1 : 1);
       const tu = Math.max(-1, Math.min(1, (x280 - cx) / tHw));
       const tMaskX = Math.abs(tu) < 1 ? Math.max(0, 1 - Math.abs(tu * tu * tu)) : 0;
       const cosTu = Math.cos(0.5 * Math.PI * tu);
@@ -436,7 +460,13 @@ const indieMouthEngine = {
           srcY = y280 - dropX * v;
         }
         const dyFromSeam = (y280 - sy) / 6.5;
-        const srcX = x280 + colPuck * Math.exp(-dyFromSeam * dyFromSeam);
+        let srcX = x280 + colPuck * Math.exp(-dyFromSeam * dyFromSeam);
+        if (smLobe > 0.001) {
+          const dySm = (y280 - (sy - 0.3)) / 6.2;
+          const smileV = Math.exp(-dySm * dySm);
+          srcY += cornerLift * smileV;
+          srcX += cornerPull * smileV;
+        }
 
         let sxf = srcX * MOUTH_SCALE - MOUTH_X0;
         let syf = srcY * MOUTH_SCALE - MOUTH_Y0;
@@ -458,7 +488,7 @@ const indieMouthEngine = {
         let g = base[i00 + 1] * w00 + base[i10 + 1] * w10 + base[i01 + 1] * w01 + base[i11 + 1] * w11;
         let b = base[i00 + 2] * w00 + base[i10 + 2] * w10 + base[i01 + 2] * w01 + base[i11 + 2] * w11;
 
-        if (wx > 0.005 && y280 > upperLim - 0.8 && y280 < lowerLim + 0.8) {
+        if (hasOpen && wx > 0.005 && y280 > upperLim - 0.8 && y280 < lowerLim + 0.8) {
           const distMin = Math.min((y280 - upperLim) * MOUTH_SCALE, (lowerLim - y280) * MOUTH_SCALE);
           let ia = distMin / 1.15;
           if (ia > 0) {
@@ -560,7 +590,10 @@ export class WeatherAvatarController {
     this.lastRafMs = 0;
     this.curOpen = 0;
     this.curRound = 0;
+    this.curSmile = 0;
+    this.smileAtEnd = false;
     this.hadBoundary = false;
+    this.lastBoundaryMs = 0;
     this.wordPhQueue = null;
     this.estTimeline = [];
     this.speechStartMs = 0;
@@ -617,9 +650,10 @@ export class WeatherAvatarController {
 
   isAutoPlayEnabled() {
     try {
-      return localStorage.getItem(this.autoplayStorageKey) === 'true';
+      const val = localStorage.getItem(this.autoplayStorageKey);
+      return val === null ? true : val === 'true';
     } catch {
-      return false;
+      return true;
     }
   }
 
@@ -655,7 +689,7 @@ export class WeatherAvatarController {
       if (!this.speaking && !this.manualStop) {
         this.onAutoClose();
       }
-    }, 1100);
+    }, 1800);
   }
 
   _clearAutoClose() {
@@ -694,21 +728,23 @@ export class WeatherAvatarController {
         items.push({ wordIdx: i, open: p.open, round: p.round, startMs: tMs, endMs: tMs + p.ms });
         tMs += p.ms;
       }
-      items.push({ wordIdx: i, open: 0.08, round: 0, startMs: tMs, endMs: tMs + 35 });
-      tMs += 35;
+      items.push({ wordIdx: i, open: 0.08, round: 0, startMs: tMs, endMs: tMs + 60 });
+      tMs += 60;
     }
     this.estTimeline = items;
   }
 
   updateVisual({ text, iconCode, tempText, condText }) {
+    this.smileAtEnd = false;
+    this.curSmile = 0;
     this.scriptData = buildSpeechScript(text);
     this._buildEstimatedTimeline();
     if (this.stageEl) {
       this.stageEl.innerHTML = renderAvatarSvg({ iconCode, tempText, condText });
-      indieMouthEngine.bindCanvas(this._getCanvas(), this.curOpen, this.curRound);
+      indieMouthEngine.bindCanvas(this._getCanvas(), this.curOpen, this.curRound, this.curSmile);
     }
     this._renderWords();
-    this._setMouth(0, 0);
+    this._setMouth(0, 0, 0);
   }
 
   _renderWords() {
@@ -729,10 +765,11 @@ export class WeatherAvatarController {
       .replace(/>/g, '&gt;');
   }
 
-  _setMouth(openAmt, roundAmt) {
+  _setMouth(openAmt, roundAmt, smileAmt = 0) {
     this.curOpen = openAmt;
     this.curRound = roundAmt;
-    indieMouthEngine.render(this._getCanvas(), openAmt, roundAmt);
+    this.curSmile = smileAmt;
+    indieMouthEngine.render(this._getCanvas(), openAmt, roundAmt, smileAmt);
   }
 
   _ensureMouthLoop() {
@@ -745,9 +782,11 @@ export class WeatherAvatarController {
 
       let targetOpen = 0;
       let targetRound = 0;
+      const targetSmile = !this.speaking && this.smileAtEnd ? 1.0 : 0.0;
 
       if (this.speaking) {
-        if (this.hadBoundary && this.wordPhQueue) {
+        const boundaryFresh = this.hadBoundary && (now - this.lastBoundaryMs) <= 950;
+        if (boundaryFresh && this.wordPhQueue) {
           this.wordPhQueue.elapsed += dtMs;
           while (
             this.wordPhQueue.idx < this.wordPhQueue.items.length - 1 &&
@@ -757,12 +796,13 @@ export class WeatherAvatarController {
             this.wordPhQueue.idx += 1;
           }
           const ph = this.wordPhQueue.items[this.wordPhQueue.idx];
-          if (ph && this.wordPhQueue.elapsed <= ph.ms + 120) {
+          if (ph && this.wordPhQueue.elapsed <= ph.ms + 180) {
             targetOpen = ph.open;
             targetRound = ph.round;
           } else {
-            targetOpen = 0.05;
-            targetRound = 0;
+            const holdT = (now - this.lastBoundaryMs) / 1000;
+            targetOpen = 0.14 + 0.22 * (0.5 + 0.5 * Math.sin(holdT * 13.0));
+            targetRound = 0.10;
           }
         } else if (this.estTimeline.length) {
           const elapsed = now - this.speechStartMs;
@@ -778,8 +818,13 @@ export class WeatherAvatarController {
               }
             }
           } else {
-            targetOpen = 0.04;
-            targetRound = 0;
+            // Continue natural conversational articulation if TTS speaks slower than estimated timeline
+            const tSec = (now - this.speechStartMs) / 1000;
+            const syl = 0.5 + 0.5 * Math.sin(tSec * 14.2 + 0.65 * Math.sin(tSec * 3.7));
+            const phrase = 0.5 + 0.5 * Math.cos(tSec * 1.9);
+            const gate = phrase < 0.08 ? 0.14 : 1.0;
+            targetOpen = (0.10 + 0.54 * syl) * gate;
+            targetRound = Math.max(0, 0.50 * Math.sin(tSec * 5.2 + 0.4));
           }
         }
       }
@@ -787,15 +832,18 @@ export class WeatherAvatarController {
       const openSpeed = targetOpen > this.curOpen ? 26 : 19;
       const aOpen = 1 - Math.exp(-openSpeed * dt);
       const aRound = 1 - Math.exp(-16 * dt);
+      const aSmile = 1 - Math.exp(-9 * dt);
       this.curOpen += (targetOpen - this.curOpen) * aOpen;
       this.curRound += (targetRound - this.curRound) * aRound;
+      this.curSmile += (targetSmile - this.curSmile) * aSmile;
 
-      indieMouthEngine.render(this._getCanvas(), this.curOpen, this.curRound);
+      indieMouthEngine.render(this._getCanvas(), this.curOpen, this.curRound, this.curSmile);
 
-      if (!this.speaking && this.curOpen < 0.005) {
+      if (!this.speaking && this.curOpen < 0.005 && Math.abs(targetSmile - this.curSmile) < 0.008) {
         this.curOpen = 0;
         this.curRound = 0;
-        indieMouthEngine.render(this._getCanvas(), 0, 0);
+        this.curSmile = targetSmile;
+        indieMouthEngine.render(this._getCanvas(), 0, 0, this.curSmile);
         this.rafId = null;
         return;
       }
@@ -823,6 +871,7 @@ export class WeatherAvatarController {
     const bounds = this.scriptData.wordBounds;
     if (!bounds.length) return;
     this.hadBoundary = true;
+    this.lastBoundaryMs = performance.now();
     for (let i = 0; i < bounds.length; i++) {
       if (charIndex <= bounds[i].end) {
         this._highlightWord(bounds[i].wordIdx, true);
@@ -844,7 +893,9 @@ export class WeatherAvatarController {
     }
 
     if (isSpeaking) {
+      this.smileAtEnd = true;
       this.hadBoundary = false;
+      this.lastBoundaryMs = performance.now();
       this.wordPhQueue = null;
       this.speechStartMs = performance.now();
       this._ensureMouthLoop();
@@ -949,9 +1000,12 @@ export class WeatherAvatarController {
         this._setSpeakingState(false);
         if (shouldAutoClose) this._scheduleAutoClose();
       };
-      utt.onerror = () => {
+      utt.onerror = (e) => {
         this.currentUtterance = null;
         this._setSpeakingState(false);
+        if (e && e.error === 'not-allowed' && this.statusTextEl) {
+          this.statusTextEl.textContent = 'TAP REPLAY TO HEAR INDIE';
+        }
       };
 
       this.currentUtterance = utt;

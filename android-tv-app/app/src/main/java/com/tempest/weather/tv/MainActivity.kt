@@ -26,8 +26,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     @Volatile
     private var ttsReady: Boolean = false
     @Volatile
+    private var ttsFailed: Boolean = false
+    @Volatile
     private var activeUtteranceId: String? = null
     private var utteranceSeq: Long = 0
+    private var pendingSpeech: Triple<String, Float, Float>? = null
 
     private fun selectBestFemaleVoice() {
         try {
@@ -58,27 +61,36 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         } catch (_: Exception) {}
     }
 
+    private fun speakNowOnUiThread(text: String, clampedRate: Float, clampedPitch: Float) {
+        try {
+            selectBestFemaleVoice()
+            tts?.setSpeechRate(clampedRate)
+            tts?.setPitch(clampedPitch)
+            val uttId = "tempest_briefing_${++utteranceSeq}"
+            activeUtteranceId = uttId
+            val params = Bundle()
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, uttId)
+        } catch (_: Exception) {
+            activeUtteranceId = null
+            webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
+        }
+    }
+
     inner class AndroidTtsBridge {
         @JavascriptInterface
-        fun isAvailable(): Boolean = ttsReady
+        fun isAvailable(): Boolean = tts != null && !ttsFailed
 
         @JavascriptInterface
         fun speak(text: String, rate: Float, pitch: Float): Boolean {
-            if (!ttsReady || tts == null || text.isBlank()) return false
+            if (tts == null || ttsFailed || text.isBlank()) return false
             val clampedRate = rate.coerceIn(0.5f, 2.0f)
             val clampedPitch = pitch.coerceIn(0.5f, 2.0f)
             runOnUiThread {
-                try {
-                    selectBestFemaleVoice()
-                    tts?.setSpeechRate(clampedRate)
-                    tts?.setPitch(clampedPitch)
-                    val uttId = "tempest_briefing_${++utteranceSeq}"
-                    activeUtteranceId = uttId
-                    val params = Bundle()
-                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, uttId)
-                } catch (_: Exception) {
-                    activeUtteranceId = null
-                    webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
+                if (!ttsReady) {
+                    pendingSpeech = Triple(text, clampedRate, clampedPitch)
+                } else {
+                    pendingSpeech = null
+                    speakNowOnUiThread(text, clampedRate, clampedPitch)
                 }
             }
             return true
@@ -87,6 +99,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         @JavascriptInterface
         fun stop() {
             runOnUiThread {
+                pendingSpeech = null
                 activeUtteranceId = null
                 try {
                     tts?.stop()
@@ -141,14 +154,35 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) {
             ttsReady = false
+            ttsFailed = true
+            pendingSpeech = null
+            runOnUiThread {
+                webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
+            }
             return
         }
         try {
             val langResult = tts?.setLanguage(Locale.US)
             ttsReady = langResult != TextToSpeech.LANG_MISSING_DATA &&
                 langResult != TextToSpeech.LANG_NOT_SUPPORTED
+            if (!ttsReady) {
+                ttsFailed = true
+                pendingSpeech = null
+                runOnUiThread {
+                    webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
+                }
+                return
+            }
 
             selectBestFemaleVoice()
+
+            val pending = pendingSpeech
+            pendingSpeech = null
+            if (pending != null) {
+                runOnUiThread {
+                    speakNowOnUiThread(pending.first, pending.second, pending.third)
+                }
+            }
 
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
