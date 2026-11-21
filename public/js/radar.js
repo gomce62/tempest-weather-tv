@@ -13,8 +13,8 @@ const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // RainViewer refreshes every 5 minut
 const FRAME_DELAY_MS = 650;
 const LATEST_FRAME_DWELL_MS = 1400;
 const FORECAST_END_DWELL_MS = 1600;
-const FUTURE_STEP_SEC = 15 * 60;
-const FUTURE_FRAME_COUNT = 4; // +15m, +30m, +45m, +60m forecast
+const FUTURE_SNAP_SEC = 15 * 60;
+const FUTURE_TARGET_MINS = [15, 30, 45, 60, 120, 180, 240, 360]; // +15m, +30m, +45m, +1h, +2h, +3h, +4h, +6h
 const RADAR_OPACITY = 0.78;
 const DARK_BASEMAP_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
@@ -199,9 +199,9 @@ export class MorroBayRadarController {
 
   buildFutureForecastFrames(anchorEpoch) {
     const frames = [];
-    const baseFuture = Math.round((anchorEpoch + FUTURE_STEP_SEC) / FUTURE_STEP_SEC) * FUTURE_STEP_SEC;
-    for (let k = 0; k < FUTURE_FRAME_COUNT; k++) {
-      const ft = baseFuture + k * FUTURE_STEP_SEC;
+    const baseFuture = Math.round((anchorEpoch + FUTURE_SNAP_SEC) / FUTURE_SNAP_SEC) * FUTURE_SNAP_SEC;
+    for (const targetMin of FUTURE_TARGET_MINS) {
+      const ft = baseFuture + (targetMin - 15) * 60;
       const isoUtc = new Date(ft * 1000).toISOString().slice(0, 16);
       const offsetMin = Math.max(5, Math.round((ft - anchorEpoch) / 60));
       frames.push({
@@ -370,16 +370,26 @@ export class MorroBayRadarController {
     }
   }
 
+  formatForecastOffset(mins, compact = false) {
+    if (mins < 60) return `+${mins}m`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (m === 0) return `+${h}h`;
+    return compact ? `+${h}h${m}m` : `+${h}h ${m}m`;
+  }
+
   updateFrameUi(idx) {
     const frame = this.frames[idx];
     if (!frame) return;
     const isLive = Boolean(frame.isLive);
     const isForecast = Boolean(frame.isForecast);
     const timeStr = this.formatFrameTime(frame.time);
+    const fcLabel = isForecast ? this.formatForecastOffset(frame.offsetMin, false) : '';
+    const fcCompact = isForecast ? this.formatForecastOffset(frame.offsetMin, true) : '';
     const modalText = isLive
       ? `${timeStr} · Live Radar`
       : isForecast
-        ? `${timeStr} · Forecast (+${frame.offsetMin}m)`
+        ? `${timeStr} · Forecast (${fcLabel})`
         : `${timeStr} · -${frame.offsetMin}m`;
 
     if (this.els.cardTimeEl) this.els.cardTimeEl.textContent = timeStr;
@@ -387,12 +397,12 @@ export class MorroBayRadarController {
     if (this.els.cardLiveBadge) {
       this.els.cardLiveBadge.classList.toggle('is-live', isLive);
       this.els.cardLiveBadge.classList.toggle('is-forecast', isForecast);
-      this.els.cardLiveBadge.textContent = isLive ? 'LIVE' : isForecast ? `+${frame.offsetMin}m` : `-${frame.offsetMin}m`;
+      this.els.cardLiveBadge.textContent = isLive ? 'LIVE' : isForecast ? fcCompact : `-${frame.offsetMin}m`;
     }
     if (this.els.modalLiveBadge) {
       this.els.modalLiveBadge.classList.toggle('is-live', isLive);
       this.els.modalLiveBadge.classList.toggle('is-forecast', isForecast);
-      this.els.modalLiveBadge.textContent = isLive ? 'LIVE' : isForecast ? `FORECAST +${frame.offsetMin}m` : `-${frame.offsetMin} MIN`;
+      this.els.modalLiveBadge.textContent = isLive ? 'LIVE' : isForecast ? `FORECAST ${fcLabel}` : `-${frame.offsetMin} MIN`;
     }
     if (this.els.cardProgressFill) {
       this.els.cardProgressFill.classList.toggle('is-forecast', isForecast);

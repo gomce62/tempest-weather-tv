@@ -2574,23 +2574,32 @@
           try { return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: this.timezone || undefined }).format(new Date(ep * 1000)); }
           catch { return new Date(ep * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
         },
+        fmtForecastOffset(mins, compact = false) {
+          if (mins < 60) return `+${mins}m`;
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          if (m === 0) return `+${h}h`;
+          return compact ? `+${h}h${m}m` : `+${h}h ${m}m`;
+        },
         updateUi(idx) {
           const f = this.frames[idx];
           if (!f) return;
           const isLive = Boolean(f.isLive);
           const isForecast = Boolean(f.isForecast);
           const ts = this.fmtTime(f.time);
+          const fcLabel = isForecast ? this.fmtForecastOffset(f.offsetMin, false) : '';
+          const fcCompact = isForecast ? this.fmtForecastOffset(f.offsetMin, true) : '';
           if (rEls.cardTime) rEls.cardTime.textContent = ts;
-          if (rEls.modalTime) rEls.modalTime.textContent = isLive ? `${ts} · Live Radar` : isForecast ? `${ts} · Forecast (+${f.offsetMin}m)` : `${ts} · -${f.offsetMin}m`;
+          if (rEls.modalTime) rEls.modalTime.textContent = isLive ? `${ts} · Live Radar` : isForecast ? `${ts} · Forecast (${fcLabel})` : `${ts} · -${f.offsetMin}m`;
           if (rEls.cardLive) {
             rEls.cardLive.classList.toggle('is-live', isLive);
             rEls.cardLive.classList.toggle('is-forecast', isForecast);
-            rEls.cardLive.textContent = isLive ? 'LIVE' : isForecast ? `+${f.offsetMin}m` : `-${f.offsetMin}m`;
+            rEls.cardLive.textContent = isLive ? 'LIVE' : isForecast ? fcCompact : `-${f.offsetMin}m`;
           }
           if (rEls.modalLive) {
             rEls.modalLive.classList.toggle('is-live', isLive);
             rEls.modalLive.classList.toggle('is-forecast', isForecast);
-            rEls.modalLive.textContent = isLive ? 'LIVE' : isForecast ? `FORECAST +${f.offsetMin}m` : `-${f.offsetMin} MIN`;
+            rEls.modalLive.textContent = isLive ? 'LIVE' : isForecast ? `FORECAST ${fcLabel}` : `-${f.offsetMin} MIN`;
           }
           if (rEls.cardProgress) rEls.cardProgress.classList.toggle('is-forecast', isForecast);
           if (rEls.modalProgress) rEls.modalProgress.classList.toggle('is-forecast', isForecast);
@@ -2674,10 +2683,11 @@
         },
         buildFutureFrames(anchorEpoch) {
           const out = [];
-          const stepSec = 15 * 60;
-          const baseFuture = Math.round((anchorEpoch + stepSec) / stepSec) * stepSec;
-          for (let k = 0; k < 4; k++) {
-            const ft = baseFuture + k * stepSec;
+          const snapSec = 15 * 60;
+          const targetMins = [15, 30, 45, 60, 120, 180, 240, 360];
+          const baseFuture = Math.round((anchorEpoch + snapSec) / snapSec) * snapSec;
+          for (const targetMin of targetMins) {
+            const ft = baseFuture + (targetMin - 15) * 60;
             const iso = new Date(ft * 1000).toISOString().slice(0, 16);
             out.push({
               key: `vc_${iso}`, time: ft, isLive: false, isForecast: true,
