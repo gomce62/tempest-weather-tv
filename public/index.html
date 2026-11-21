@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -274,6 +276,48 @@
           </div>
         </article>
       </div>
+
+      <!-- Right Doppler Radar Card (Morro Bay via RainViewer API) -->
+      <article id="radar-card" class="metric-card radar-card">
+        <div class="radar-card-header">
+          <div class="radar-title-group">
+            <span class="card-label">DOPPLER RADAR</span>
+            <span class="radar-location-tag">Morro Bay, CA</span>
+          </div>
+          <div class="radar-header-actions">
+            <span id="radar-live-badge" class="radar-live-badge is-live">LIVE</span>
+            <span id="radar-card-time" class="radar-time-pill">--:--</span>
+            <button id="btn-radar-play" class="radar-mini-btn" type="button" title="Pause radar loop" aria-label="Pause radar loop">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+            </button>
+            <button id="btn-radar-expand" class="radar-mini-btn radar-expand-btn" type="button" title="Expand radar to full view" aria-label="Expand radar to full view">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div id="radar-card-map-wrap" class="radar-map-wrap">
+          <div id="radar-card-map" class="radar-map-canvas"></div>
+        </div>
+
+        <div class="radar-progress-track" aria-hidden="true">
+          <div id="radar-card-progress" class="radar-progress-fill" style="width: 100%;"></div>
+        </div>
+
+        <div class="radar-card-footer">
+          <div class="radar-legend">
+            <span>Light</span>
+            <span class="radar-legend-bar" aria-hidden="true"></span>
+            <span>Heavy</span>
+          </div>
+          <a class="radar-attribution" href="https://www.rainviewer.com/" target="_blank" rel="noopener noreferrer">Weather data by RainViewer</a>
+        </div>
+      </article>
     </section>
 
     <!-- Forecast Strip -->
@@ -471,6 +515,49 @@
               <span>Auto-play on launch</span>
             </label>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full-View Doppler Radar Modal -->
+  <div id="radar-fullscreen-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="radar-modal-title">
+    <div class="radar-modal-card">
+      <div class="radar-modal-header">
+        <div class="radar-modal-title-row">
+          <h2 id="radar-modal-title" class="radar-modal-title">Morro Bay Live Doppler Radar</h2>
+          <span id="radar-modal-live-badge" class="radar-live-badge is-live">LIVE</span>
+          <span id="radar-modal-time" class="radar-modal-time">--:--</span>
+        </div>
+        <div class="radar-modal-top-actions">
+          <button id="btn-radar-modal-recenter" class="radar-ctrl-btn" type="button" title="Center on Morro Bay">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+            <span>Morro Bay</span>
+          </button>
+          <button id="btn-radar-modal-zoom-in" class="radar-ctrl-btn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+          <button id="btn-radar-modal-zoom-out" class="radar-ctrl-btn" type="button" title="Zoom out" aria-label="Zoom out">&minus;</button>
+          <button id="btn-radar-modal-close" class="detail-nav-btn" type="button" title="Close" aria-label="Close">&times;</button>
+        </div>
+      </div>
+
+      <div class="radar-modal-map-wrap">
+        <div id="radar-modal-map" class="radar-map-canvas"></div>
+      </div>
+
+      <div class="radar-modal-footer">
+        <div class="radar-modal-playback">
+          <button id="btn-radar-modal-prev" class="radar-ctrl-btn" type="button" title="Previous frame" aria-label="Previous frame">&lsaquo;</button>
+          <button id="btn-radar-modal-play" class="radar-ctrl-btn is-primary" type="button">Pause</button>
+          <button id="btn-radar-modal-next" class="radar-ctrl-btn" type="button" title="Next frame" aria-label="Next frame">&rsaquo;</button>
+          <input id="radar-modal-slider" class="radar-timeline-slider" type="range" min="0" max="11" value="11" aria-label="Radar timeline" />
+        </div>
+        <div class="radar-modal-meta-right">
+          <div class="radar-legend">
+            <span>Light</span>
+            <span class="radar-legend-bar" aria-hidden="true"></span>
+            <span>Heavy</span>
+          </div>
+          <a class="radar-attribution" href="https://www.rainviewer.com/" target="_blank" rel="noopener noreferrer">Weather data by RainViewer &middot; &copy; OpenStreetMap &copy; CARTO</a>
         </div>
       </div>
     </div>

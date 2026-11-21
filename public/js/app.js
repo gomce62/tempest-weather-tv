@@ -19,6 +19,7 @@ import {
   buildWeathermanBriefingFromDashboard,
 } from './tempest-client.js';
 import { WeatherAvatarController, buildIndieForecastFromDashboard } from './avatar.js';
+import { MorroBayRadarController } from './radar.js';
 
 const STORAGE_KEYS = {
   stationId: 'tempest_station_id',
@@ -172,6 +173,28 @@ const avatarController = new WeatherAvatarController({
   btnToggleSpeak: els.avatarToggleSpeak,
   onAutoClose: () => closeAvatarBriefing(),
   autoplayStorageKey: 'tempest_avatar_autoplay',
+});
+
+const radarController = new MorroBayRadarController({
+  cardMapEl: document.getElementById('radar-card-map'),
+  cardMapWrap: document.getElementById('radar-card-map-wrap'),
+  cardTimeEl: document.getElementById('radar-card-time'),
+  cardLiveBadge: document.getElementById('radar-live-badge'),
+  cardProgressFill: document.getElementById('radar-card-progress'),
+  btnCardPlay: document.getElementById('btn-radar-play'),
+  btnCardExpand: document.getElementById('btn-radar-expand'),
+  modalBackdrop: document.getElementById('radar-fullscreen-modal'),
+  modalMapEl: document.getElementById('radar-modal-map'),
+  modalTimeEl: document.getElementById('radar-modal-time'),
+  modalLiveBadge: document.getElementById('radar-modal-live-badge'),
+  modalSlider: document.getElementById('radar-modal-slider'),
+  btnModalPlay: document.getElementById('btn-radar-modal-play'),
+  btnModalPrev: document.getElementById('btn-radar-modal-prev'),
+  btnModalNext: document.getElementById('btn-radar-modal-next'),
+  btnModalZoomIn: document.getElementById('btn-radar-modal-zoom-in'),
+  btnModalZoomOut: document.getElementById('btn-radar-modal-zoom-out'),
+  btnModalRecenter: document.getElementById('btn-radar-modal-recenter'),
+  btnModalClose: document.getElementById('btn-radar-modal-close'),
 });
 
 const tempestWs = new TempestWebSocket({
@@ -370,12 +393,14 @@ function updateConnectionStatusUi() {
 function showNotice(message, isError = false, showAction = true) {
   if (!message) {
     els.noticeBanner.classList.add('hidden');
+    radarController.invalidateSize();
     return;
   }
   els.noticeText.textContent = message;
   els.noticeBanner.classList.toggle('is-error', isError);
   els.noticeAction.classList.toggle('hidden', !showAction);
   els.noticeBanner.classList.remove('hidden');
+  radarController.invalidateSize();
 }
 
 /* ---------- Rendering ---------- */
@@ -398,6 +423,7 @@ function renderDashboard(data) {
   state.data = data;
   const isMetric = data.units === 'metric';
   const { station, current: cur, astronomy, daily } = data;
+  if (station?.timezone) radarController.setTimezone(station.timezone);
 
   // Header
   els.stationName.textContent = station.name;
@@ -979,6 +1005,7 @@ function bindEvents() {
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (radarController.modalOpen) radarController.closeFullView();
       if (els.avatarModal && !els.avatarModal.classList.contains('hidden')) closeAvatarBriefing();
       if (!els.dayDetailModal.classList.contains('hidden')) closeDayDetail();
       if (!els.modal.classList.contains('hidden')) closeSettingsModal();
@@ -988,6 +1015,10 @@ function bindEvents() {
         openDayDetail(activeDetailDayIdx + 1);
       }
     }
+  });
+
+  window.addEventListener('resize', () => {
+    radarController.invalidateSize();
   });
 
   els.btnUnits.addEventListener('click', () => {
@@ -1069,6 +1100,7 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
+  radarController.init();
   formatClock();
 
   // Check if local backend proxy is running & already has a .env token configured

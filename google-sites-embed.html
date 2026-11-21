@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
       --bg-canvas: #141517;
@@ -37,6 +39,10 @@
       overflow-x: hidden;
     }
 
+    @media (min-width: 1041px) and (min-height: 620px) {
+      html, body { height: 100vh; overflow: hidden; }
+    }
+
     body { display: flex; flex-direction: column; }
     .hidden { display: none !important; }
 
@@ -50,7 +56,7 @@
     .top-bar {
       background: linear-gradient(180deg, #27282d 0%, #202125 100%);
       border-bottom: 1px solid #2e3036;
-      padding: 10px 24px;
+      padding: clamp(6px, 0.9vh, 10px) 22px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -58,12 +64,12 @@
       flex-shrink: 0;
     }
 
-    .header-left { display: flex; align-items: center; gap: 26px; min-width: 0; }
+    .header-left { display: flex; align-items: center; gap: 24px; min-width: 0; }
     .brand-lockup { display: flex; align-items: center; gap: 10px; flex-shrink: 0; user-select: none; }
     .brand-text { display: flex; flex-direction: column; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; line-height: 1.25; color: #dfe3e8; }
-    .station-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .station-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .station-title-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-    .station-name { font-size: 21px; font-weight: 400; color: var(--text-primary); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .station-name { font-size: clamp(18px, 1.5vw, 21px); font-weight: 400; color: var(--text-primary); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .station-badge {
       background: transparent;
@@ -106,27 +112,28 @@
 
     .clock-block { text-align: right; line-height: 1.15; }
     .clock-time-row { display: flex; align-items: baseline; justify-content: flex-end; gap: 5px; }
-    .clock-time { font-size: 32px; font-weight: 300; color: var(--text-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-    .clock-ampm { font-size: 12.5px; font-weight: 400; color: var(--text-secondary); }
-    .clock-date { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
+    .clock-time { font-size: clamp(24px, 2.2vw, 31px); font-weight: 300; color: var(--text-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+    .clock-ampm { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+    .clock-date { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 
     .notice-banner {
       background: rgba(239, 173, 80, 0.1);
       border-bottom: 1px solid rgba(239, 173, 80, 0.28);
-      padding: 7px 24px;
+      padding: 5px 22px;
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      font-size: 12.5px; color: #f4d399;
+      font-size: 12px; color: #f4d399; flex-shrink: 0;
     }
     .notice-banner.is-error { background: rgba(239, 68, 68, 0.12); border-bottom-color: rgba(239, 68, 68, 0.35); color: #fca5a5; }
     .notice-action {
       background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #fff; padding: 4px 10px; border-radius: 5px; font-family: inherit; font-size: 11.5px; font-weight: 500; cursor: pointer;
+      color: #fff; padding: 3px 10px; border-radius: 5px; font-family: inherit; font-size: 11px; font-weight: 500; cursor: pointer;
     }
     .notice-action:hover { background: rgba(255, 255, 255, 0.18); }
 
     .dashboard-main {
-      flex: 1; width: 100%; max-width: 1640px; margin: 0 auto;
-      padding: 16px 24px 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 15px;
+      flex: 1 1 auto; min-height: 0; width: 100%; max-width: 1680px; margin: 0 auto;
+      padding: clamp(8px, 1.2vh, 14px) 22px clamp(8px, 1.2vh, 14px);
+      display: flex; flex-direction: column; justify-content: space-between; gap: clamp(8px, 1.15vh, 14px);
     }
 
     .briefing-card {
@@ -134,10 +141,8 @@
       border: 1px solid var(--border-subtle);
       border-left: 3px solid var(--accent-blue);
       border-radius: 8px;
-      padding: 11px 18px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
+      padding: clamp(7px, 0.9vh, 10px) 16px;
+      display: flex; align-items: center; gap: 14px; flex-shrink: 0;
     }
     .briefing-card.is-interactive { cursor: pointer; transition: border-color 0.16s ease, background 0.16s ease; }
     .briefing-card.is-interactive:hover, .briefing-card.is-interactive:focus-visible {
@@ -146,66 +151,82 @@
       outline: none;
     }
     .briefing-badge {
-      display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 600;
       letter-spacing: 0.09em; color: #7cc4ec; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
     }
     .briefing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-blue); box-shadow: 0 0 8px rgba(88, 166, 255, 0.75); }
-    .briefing-text { font-size: 14px; line-height: 1.48; color: #e4e8ef; min-width: 0; flex: 1; }
+    .briefing-text {
+      font-size: clamp(12.5px, 1vw, 13.5px); line-height: 1.38; color: #e4e8ef; min-width: 0; flex: 1;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
     .briefing-play-btn {
-      flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px;
+      flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px;
       border-radius: 999px; border: 1px solid rgba(96, 174, 255, 0.4); background: rgba(96, 174, 255, 0.14);
-      color: #cde6ff; font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.03em; cursor: pointer;
+      color: #cde6ff; font-family: inherit; font-size: 11.5px; font-weight: 600; letter-spacing: 0.03em; cursor: pointer;
       transition: all 0.15s ease;
     }
     .briefing-play-btn:hover { background: rgba(96, 174, 255, 0.28); border-color: var(--accent-blue); color: #ffffff; }
 
-    .upper-grid { display: grid; grid-template-columns: minmax(300px, 36.5%) 1fr; gap: 22px; align-items: stretch; }
-    .hero-panel { display: flex; flex-direction: column; justify-content: center; padding: 6px 8px 4px 4px; }
-    .temp-hero { display: flex; align-items: stretch; gap: 8px; line-height: 1; }
-    .temp-whole { font-size: clamp(92px, 10vw, 144px); font-weight: 300; line-height: 0.85; letter-spacing: -0.04em; color: var(--accent-amber); font-variant-numeric: tabular-nums; transition: color 0.4s ease; }
-    .temp-side-stack { display: flex; flex-direction: column; justify-content: space-between; padding: 4px 0 2px; }
-    .temp-unit { font-size: clamp(22px, 2.3vw, 32px); font-weight: 300; color: #d5dae0; line-height: 1; }
-    .temp-decimal { font-size: clamp(32px, 3.5vw, 48px); font-weight: 300; line-height: 0.85; color: var(--accent-amber); font-variant-numeric: tabular-nums; transition: color 0.4s ease; }
+    .upper-grid {
+      flex: 1 1 auto; min-height: 0; display: grid;
+      grid-template-columns: minmax(215px, 24%) minmax(0, 1fr) minmax(245px, 26.5%);
+      gap: clamp(10px, 1.15vw, 18px); align-items: stretch;
+    }
+    .hero-panel { display: flex; flex-direction: column; justify-content: center; padding: 2px 4px; min-width: 0; }
+    .temp-hero { display: flex; align-items: stretch; gap: 6px; line-height: 1; }
+    .temp-whole { font-size: clamp(66px, 6.2vw, 114px); font-weight: 300; line-height: 0.85; letter-spacing: -0.04em; color: var(--accent-amber); font-variant-numeric: tabular-nums; transition: color 0.4s ease; }
+    .temp-side-stack { display: flex; flex-direction: column; justify-content: space-between; padding: 3px 0 2px; }
+    .temp-unit { font-size: clamp(18px, 1.7vw, 28px); font-weight: 300; color: #d5dae0; line-height: 1; }
+    .temp-decimal { font-size: clamp(24px, 2.5vw, 40px); font-weight: 300; line-height: 0.85; color: var(--accent-amber); font-variant-numeric: tabular-nums; transition: color 0.4s ease; }
 
-    .feels-like { margin-top: 14px; font-size: 16.5px; font-weight: 400; color: var(--text-secondary); }
+    .feels-like { margin-top: clamp(6px, 1vh, 12px); font-size: clamp(13px, 1.1vw, 15.5px); font-weight: 400; color: var(--text-secondary); }
     .feels-like strong { color: var(--text-primary); font-weight: 400; }
 
-    .condition-block { margin-top: 22px; display: flex; align-items: flex-start; gap: 14px; }
-    .hero-icon { flex-shrink: 0; width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; }
+    .condition-block { margin-top: clamp(8px, 1.4vh, 18px); display: flex; align-items: flex-start; gap: 11px; }
+    .hero-icon { flex-shrink: 0; width: clamp(38px, 3.4vw, 50px); height: clamp(38px, 3.4vw, 50px); display: flex; align-items: center; justify-content: center; }
+    .hero-icon svg { width: 100%; height: 100%; }
     .condition-copy { min-width: 0; }
-    .condition-title { font-size: 23px; font-weight: 400; color: var(--text-primary); line-height: 1.2; }
-    .condition-summary { margin-top: 5px; font-size: 13.5px; line-height: 1.45; color: var(--text-secondary); max-width: 340px; }
+    .condition-title { font-size: clamp(16px, 1.45vw, 22px); font-weight: 400; color: var(--text-primary); line-height: 1.2; }
+    .condition-summary { margin-top: 4px; font-size: clamp(11.5px, 0.9vw, 13px); line-height: 1.38; color: var(--text-secondary); max-width: 310px; }
 
-    .temp-range-widget { margin-top: 26px; max-width: 440px; }
-    .temp-range-labels { display: flex; justify-content: space-between; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: #b4bbc4; margin-bottom: 9px; }
+    .temp-range-widget { margin-top: clamp(10px, 1.5vh, 20px); max-width: 350px; }
+    .temp-range-labels { display: flex; justify-content: space-between; font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em; color: #b4bbc4; margin-bottom: 7px; }
     .temp-range-labels strong { color: #e5e8ec; font-weight: 500; }
-    .temp-range-track { height: 6px; width: 100%; border-radius: 999px; background: linear-gradient(90deg, #8e9e45 0%, #c6a542 48%, #eba53d 100%); position: relative; }
+    .temp-range-track { height: 5px; width: 100%; border-radius: 999px; background: linear-gradient(90deg, #8e9e45 0%, #c6a542 48%, #eba53d 100%); position: relative; }
     .temp-range-dot {
-      position: absolute; top: 50%; width: 15px; height: 15px; border-radius: 50%;
-      background: #141517; border: 2.6px solid #ebb050; transform: translate(-50%, -50%);
+      position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%;
+      background: #141517; border: 2.5px solid #ebb050; transform: translate(-50%, -50%);
       box-shadow: 0 0 10px rgba(235, 176, 80, 0.45); transition: left 0.55s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
-    .metrics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(154px, 1fr)); gap: 12px; }
+    .metrics-grid {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(0, 1fr)); gap: clamp(8px, 0.8vw, 11px);
+      min-height: 0; height: 100%;
+    }
     .metric-card {
       background-color: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 8px;
-      padding: 15px 18px 14px; display: flex; flex-direction: column; justify-content: space-between;
+      padding: clamp(8px, 1.1vh, 13px) clamp(10px, 0.95vw, 15px);
+      display: flex; flex-direction: column; justify-content: space-between; min-height: 0; overflow: hidden;
       transition: border-color 0.2s ease, background-color 0.2s ease;
     }
     .metric-card:hover { border-color: var(--border-card-hover); background-color: var(--bg-card-hover); }
-    .card-label { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: var(--text-secondary); text-transform: uppercase; }
-    .card-body-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
+    .card-label { font-size: clamp(9.5px, 0.78vw, 11px); font-weight: 500; letter-spacing: 0.08em; color: var(--text-secondary); text-transform: uppercase; white-space: nowrap; }
+    .card-body-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 3px; min-height: 0; }
     .card-primary-stack { display: flex; flex-direction: column; min-width: 0; }
-    .card-value-line { display: flex; align-items: baseline; gap: 5px; line-height: 1.05; }
-    .card-value { font-size: clamp(28px, 2.7vw, 39px); font-weight: 400; color: var(--text-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-    .card-unit { font-size: 13px; font-weight: 400; color: var(--text-secondary); }
-    .card-inline-meta { margin-top: 5px; font-size: 12.5px; color: var(--text-secondary); }
+    .card-value-line { display: flex; align-items: baseline; gap: 4px; line-height: 1.05; }
+    .card-value { font-size: clamp(22px, 2vw, 33px); font-weight: 400; color: var(--text-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; white-space: nowrap; }
+    .card-unit { font-size: clamp(11px, 0.88vw, 13px); font-weight: 400; color: var(--text-secondary); }
+    .card-inline-meta { margin-top: 3px; font-size: clamp(10.5px, 0.85vw, 12px); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .card-gauge { flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-    .card-footer-row { display: flex; align-items: flex-end; gap: 22px; margin-top: 10px; }
-    .card-sub-group { display: flex; flex-direction: column; gap: 2px; }
-    .sub-label { font-size: 9.5px; font-weight: 500; letter-spacing: 0.07em; color: var(--text-muted); text-transform: uppercase; }
-    .sub-value { font-size: 15.5px; font-weight: 400; color: #e4e7ec; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .sub-unit { font-size: 11px; color: var(--text-secondary); }
+    .card-gauge svg { width: clamp(40px, 3.6vw, 58px); height: clamp(40px, 3.6vw, 58px); }
+    #gauge-precip svg { width: clamp(32px, 2.8vw, 44px); height: clamp(42px, 3.8vw, 58px); }
+    #gauge-uv svg { width: clamp(42px, 3.8vw, 60px); height: clamp(36px, 3.2vw, 52px); }
+    .card-footer-row { display: flex; align-items: flex-end; gap: clamp(10px, 1.1vw, 18px); margin-top: 4px; }
+    .card-sub-group { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .sub-label { font-size: 9px; font-weight: 500; letter-spacing: 0.07em; color: var(--text-muted); text-transform: uppercase; white-space: nowrap; }
+    .sub-value { font-size: clamp(12px, 1vw, 14.5px); font-weight: 400; color: #e4e7ec; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sub-unit { font-size: 10.5px; color: var(--text-secondary); }
 
     .uv-low { color: #67c23a; }
     .uv-moderate { color: #eab308; }
@@ -213,34 +234,35 @@
     .uv-very-high { color: #ef4444; }
     .uv-extreme { color: #c084fc; }
 
-    .forecast-section { display: flex; flex-direction: column; gap: 8px; }
-    .section-heading { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: var(--text-secondary); text-transform: uppercase; }
-    .forecast-strip { display: grid; grid-template-columns: repeat(var(--day-count, 15), minmax(0, 1fr)); gap: 6px; }
+    .forecast-section { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+    .section-heading { font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; color: var(--text-secondary); text-transform: uppercase; }
+    .forecast-strip { display: grid; grid-template-columns: repeat(var(--day-count, 15), minmax(0, 1fr)); gap: 5px; }
     .forecast-day {
-      background-color: #191a1d; border: 1px solid #26282d; border-radius: 7px; padding: 9px 4px 8px;
+      background-color: #191a1d; border: 1px solid #26282d; border-radius: 7px; padding: clamp(5px, 0.7vh, 8px) 3px;
       display: flex; flex-direction: column; align-items: center; text-align: center; cursor: pointer;
       transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
     }
     .forecast-day:hover { border-color: #58a6ff; background-color: #21242b; transform: translateY(-2px); }
     .forecast-day:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
     .forecast-day.is-today { background-color: var(--bg-forecast-today); border-color: var(--border-today); }
-    .fc-dow { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; color: #d6dbe2; text-transform: uppercase; }
+    .fc-dow { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #d6dbe2; text-transform: uppercase; }
     .forecast-day.is-today .fc-dow { color: #79bfe8; }
-    .fc-date { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; }
-    .fc-icon { margin: 7px 0 6px; height: 36px; display: flex; align-items: center; justify-content: center; }
+    .fc-date { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+    .fc-icon { margin: clamp(3px, 0.5vh, 6px) 0; height: clamp(24px, 3vh, 33px); display: flex; align-items: center; justify-content: center; }
+    .fc-icon svg { width: clamp(24px, 3vh, 33px); height: clamp(24px, 3vh, 33px); }
     .fc-temps { display: flex; align-items: baseline; justify-content: center; gap: 4px; font-variant-numeric: tabular-nums; }
-    .fc-high { font-size: 15px; font-weight: 500; color: var(--text-primary); }
-    .fc-low { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
-    .fc-bar-track { width: calc(100% - 14px); height: 3.5px; border-radius: 999px; background-color: #2a2d34; margin: 7px 0; position: relative; overflow: hidden; }
+    .fc-high { font-size: clamp(13px, 1vw, 15px); font-weight: 500; color: var(--text-primary); }
+    .fc-low { font-size: clamp(10.5px, 0.85vw, 12px); font-weight: 400; color: var(--text-secondary); }
+    .fc-bar-track { width: calc(100% - 14px); height: 3.5px; border-radius: 999px; background-color: #2a2d34; margin: 4px 0; position: relative; overflow: hidden; }
     .fc-bar-fill { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: linear-gradient(90deg, #4fa8d6 0%, #c9a745 55%, #eb9e3b 100%); }
-    .fc-pop { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: #7ab8db; font-variant-numeric: tabular-nums; }
+    .fc-pop { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; color: #7ab8db; font-variant-numeric: tabular-nums; }
 
     .footer-bar {
       background-color: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 8px;
-      padding: 9px 18px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding: clamp(6px, 0.8vh, 9px) 16px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-shrink: 0;
     }
-    .astro-group { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
-    .astro-item { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+    .astro-group { display: flex; align-items: center; gap: clamp(14px, 1.7vw, 26px); flex-wrap: wrap; }
+    .astro-item { display: inline-flex; align-items: center; gap: 7px; font-size: clamp(11.5px, 0.9vw, 13px); }
     .astro-icon { display: inline-flex; align-items: center; }
     .astro-label { color: var(--text-secondary); }
     .astro-value { color: var(--text-primary); font-weight: 400; }
@@ -321,8 +343,9 @@
     .btn-secondary { background: transparent; border: 1px solid #383c45; color: #d1d5db; }
     .btn-secondary:hover { background: rgba(255, 255, 255, 0.06); }
 
-    @media (max-width: 1140px) {
+    @media (max-width: 1040px) {
       .upper-grid { grid-template-columns: 1fr; }
+      .radar-card { min-height: 290px; }
       .forecast-strip { grid-template-columns: repeat(var(--day-count, 10), minmax(74px, 1fr)); overflow-x: auto; padding-bottom: 6px; }
     }
     @media (max-width: 780px) {
@@ -365,6 +388,68 @@
       .avatar-modal-grid { grid-template-columns: 1fr; justify-items: center; }
       .avatar-copy-col { width: 100%; }
     }
+
+    /* Morro Bay Doppler Radar Card & Full-View Modal */
+    .radar-card { gap: 6px; padding: clamp(8px, 1vh, 12px) clamp(10px, 0.95vw, 14px); }
+    .radar-card-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-shrink: 0; }
+    .radar-title-group { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .radar-location-tag { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .radar-header-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .radar-live-badge {
+      font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em; padding: 2px 6px; border-radius: 999px;
+      background: rgba(148, 163, 184, 0.14); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.25); white-space: nowrap;
+    }
+    .radar-live-badge.is-live { background: rgba(74, 222, 128, 0.14); color: #86efac; border-color: rgba(74, 222, 128, 0.35); }
+    .radar-time-pill { font-size: 11px; font-weight: 500; color: #dbe2ea; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .radar-mini-btn {
+      width: 25px; height: 25px; border-radius: 5px; border: 1px solid #30343d; background: rgba(255, 255, 255, 0.05);
+      color: #d0d6df; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease;
+    }
+    .radar-mini-btn:hover { background: rgba(88, 166, 255, 0.18); border-color: var(--accent-blue); color: #ffffff; }
+    .radar-map-wrap { flex: 1 1 auto; min-height: 0; position: relative; border-radius: 6px; overflow: hidden; border: 1px solid #262a33; background: #0f1318; }
+    .radar-map-canvas { width: 100%; height: 100%; background: #0f1318; }
+    .leaflet-container { background: #0f1318 !important; font-family: inherit !important; }
+    .radar-morro-marker-wrap { display: flex; align-items: center; gap: 5px; pointer-events: none; }
+    .radar-morro-dot {
+      width: 11px; height: 11px; border-radius: 50%; background: #58a6ff; border: 2px solid #ffffff;
+      box-shadow: 0 0 0 4px rgba(88, 166, 255, 0.35), 0 0 12px rgba(88, 166, 255, 0.9);
+    }
+    .radar-morro-label {
+      background: rgba(15, 19, 24, 0.86); color: #f1f5f9; border: 1px solid rgba(88, 166, 255, 0.45);
+      border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 500; white-space: nowrap;
+    }
+    .radar-progress-track { height: 3px; width: 100%; border-radius: 999px; background: #252830; overflow: hidden; flex-shrink: 0; }
+    .radar-progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #38bdf8, #58a6ff); transition: width 0.25s ease; }
+    .radar-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0; font-size: 10px; color: var(--text-muted); }
+    .radar-legend { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .radar-legend-bar {
+      width: 52px; height: 5px; border-radius: 999px;
+      background: linear-gradient(90deg, #88ddee 0%, #00a3e0 28%, #ffee00 54%, #ff4400 78%, #c10000 92%, #ffaaff 100%);
+    }
+    .radar-attribution { color: var(--text-muted); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .radar-attribution:hover { color: var(--accent-blue); text-decoration: underline; }
+    .radar-modal-card {
+      width: min(1240px, 95vw); height: min(820px, 90vh); background: #17191e; border: 1px solid #323742; border-radius: 14px;
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.85); display: flex; flex-direction: column; overflow: hidden; padding: 16px 20px; gap: 12px;
+    }
+    .radar-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-shrink: 0; flex-wrap: wrap; }
+    .radar-modal-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .radar-modal-title { font-size: 18px; font-weight: 500; color: var(--text-primary); }
+    .radar-modal-time { font-size: 14px; color: #d8dee7; font-variant-numeric: tabular-nums; }
+    .radar-modal-top-actions { display: flex; align-items: center; gap: 6px; }
+    .radar-ctrl-btn {
+      height: 32px; min-width: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #343944;
+      background: rgba(255, 255, 255, 0.05); color: #e2e8f0; font-family: inherit; font-size: 13px; font-weight: 500;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: all 0.15s ease;
+    }
+    .radar-ctrl-btn:hover { background: rgba(88, 166, 255, 0.2); border-color: var(--accent-blue); color: #ffffff; }
+    .radar-ctrl-btn.is-primary { background: #2563eb; border-color: #3b82f6; color: #ffffff; }
+    .radar-ctrl-btn.is-primary:hover { background: #1d4ed8; }
+    .radar-modal-map-wrap { flex: 1 1 auto; min-height: 0; border-radius: 10px; overflow: hidden; border: 1px solid #2c313c; background: #0f1318; }
+    .radar-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-shrink: 0; flex-wrap: wrap; }
+    .radar-modal-playback { display: flex; align-items: center; gap: 8px; flex: 1 1 320px; }
+    .radar-timeline-slider { flex: 1; min-width: 140px; accent-color: var(--accent-blue); cursor: pointer; }
+    .radar-modal-meta-right { display: flex; align-items: center; gap: 16px; font-size: 11.5px; color: var(--text-muted); flex-wrap: wrap; }
   </style>
 </head>
 <body>
@@ -591,6 +676,44 @@
           </div>
         </article>
       </div>
+
+      <article id="radar-card" class="metric-card radar-card">
+        <div class="radar-card-header">
+          <div class="radar-title-group">
+            <span class="card-label">DOPPLER RADAR</span>
+            <span class="radar-location-tag">Morro Bay, CA</span>
+          </div>
+          <div class="radar-header-actions">
+            <span id="radar-live-badge" class="radar-live-badge is-live">LIVE</span>
+            <span id="radar-card-time" class="radar-time-pill">--:--</span>
+            <button id="btn-radar-play" class="radar-mini-btn" type="button" title="Pause radar loop" aria-label="Pause radar loop">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+            </button>
+            <button id="btn-radar-expand" class="radar-mini-btn radar-expand-btn" type="button" title="Expand radar to full view" aria-label="Expand radar to full view">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div id="radar-card-map-wrap" class="radar-map-wrap">
+          <div id="radar-card-map" class="radar-map-canvas"></div>
+        </div>
+        <div class="radar-progress-track" aria-hidden="true">
+          <div id="radar-card-progress" class="radar-progress-fill" style="width: 100%;"></div>
+        </div>
+        <div class="radar-card-footer">
+          <div class="radar-legend">
+            <span>Light</span>
+            <span class="radar-legend-bar" aria-hidden="true"></span>
+            <span>Heavy</span>
+          </div>
+          <a class="radar-attribution" href="https://www.rainviewer.com/" target="_blank" rel="noopener noreferrer">Weather data by RainViewer</a>
+        </div>
+      </article>
     </section>
 
     <section class="forecast-section">
@@ -744,6 +867,46 @@
               <span>Auto-play on launch</span>
             </label>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="radar-fullscreen-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="radar-modal-title">
+    <div class="radar-modal-card">
+      <div class="radar-modal-header">
+        <div class="radar-modal-title-row">
+          <h2 id="radar-modal-title" class="radar-modal-title">Morro Bay Live Doppler Radar</h2>
+          <span id="radar-modal-live-badge" class="radar-live-badge is-live">LIVE</span>
+          <span id="radar-modal-time" class="radar-modal-time">--:--</span>
+        </div>
+        <div class="radar-modal-top-actions">
+          <button id="btn-radar-modal-recenter" class="radar-ctrl-btn" type="button" title="Center on Morro Bay">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+            <span>Morro Bay</span>
+          </button>
+          <button id="btn-radar-modal-zoom-in" class="radar-ctrl-btn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+          <button id="btn-radar-modal-zoom-out" class="radar-ctrl-btn" type="button" title="Zoom out" aria-label="Zoom out">&minus;</button>
+          <button id="btn-radar-modal-close" class="detail-nav-btn" type="button" title="Close" aria-label="Close">&times;</button>
+        </div>
+      </div>
+      <div class="radar-modal-map-wrap">
+        <div id="radar-modal-map" class="radar-map-canvas"></div>
+      </div>
+      <div class="radar-modal-footer">
+        <div class="radar-modal-playback">
+          <button id="btn-radar-modal-prev" class="radar-ctrl-btn" type="button" title="Previous frame" aria-label="Previous frame">&lsaquo;</button>
+          <button id="btn-radar-modal-play" class="radar-ctrl-btn is-primary" type="button">Pause</button>
+          <button id="btn-radar-modal-next" class="radar-ctrl-btn" type="button" title="Next frame" aria-label="Next frame">&rsaquo;</button>
+          <input id="radar-modal-slider" class="radar-timeline-slider" type="range" min="0" max="11" value="11" aria-label="Radar timeline" />
+        </div>
+        <div class="radar-modal-meta-right">
+          <div class="radar-legend">
+            <span>Light</span>
+            <span class="radar-legend-bar" aria-hidden="true"></span>
+            <span>Heavy</span>
+          </div>
+          <a class="radar-attribution" href="https://www.rainviewer.com/" target="_blank" rel="noopener noreferrer">Weather data by RainViewer &middot; &copy; OpenStreetMap &copy; CARTO</a>
         </div>
       </div>
     </div>
@@ -1652,10 +1815,11 @@
     }
 
     function showNotice(msg, isErr) {
-      if (!msg) { els.noticeBanner.classList.add('hidden'); return; }
+      if (!msg) { els.noticeBanner.classList.add('hidden'); if (typeof radarCtrl !== 'undefined') radarCtrl.invalidateSize(); return; }
       els.noticeText.textContent = msg;
       els.noticeBanner.classList.toggle('is-error', Boolean(isErr));
       els.noticeBanner.classList.remove('hidden');
+      if (typeof radarCtrl !== 'undefined') radarCtrl.invalidateSize();
     }
 
     function renderWindCard(data) {
@@ -1672,6 +1836,7 @@
     function renderDashboard(data) {
       state.data = data;
       const m = data.units === 'metric', st = data.station, cur = data.current;
+      if (st && st.timezone && typeof radarCtrl !== 'undefined') radarCtrl.setTimezone(st.timezone);
       els.stationName.textContent = st.name;
       els.stationBadge.textContent = st.badge;
       const latD = st.latitude >= 0 ? '°N' : '°S', lonD = st.longitude >= 0 ? '°E' : '°W';
@@ -2721,12 +2886,215 @@
     els.modalClose.addEventListener('click', closeModal);
     els.modal.addEventListener('click', (e) => { if (e.target === els.modal) closeModal(); });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { closeModal(); closeDayDetail(); closeAvatarBriefing(); }
+      if (e.key === 'Escape') {
+        if (typeof radarCtrl !== 'undefined' && radarCtrl.modalOpen) radarCtrl.closeFullView();
+        closeModal(); closeDayDetail(); closeAvatarBriefing();
+      }
       else if (!els.dayDetailModal.classList.contains('hidden')) {
         if (e.key === 'ArrowLeft' && activeDetailDayIdx > 0) openDayDetail(activeDetailDayIdx - 1);
         if (e.key === 'ArrowRight' && activeDetailDayIdx < Math.min(14, ((state.data && state.data.daily && state.data.daily.length) || 1) - 1)) openDayDetail(activeDetailDayIdx + 1);
       }
     });
+
+    /* ---------- Morro Bay Doppler Radar (RainViewer API + Leaflet) ---------- */
+    const radarCtrl = (function () {
+      const API_URL = 'https://api.rainviewer.com/public/weather-maps.json';
+      const MORRO_BAY = [35.3658, -120.85];
+      const BASEMAP_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+      const PLAY_ICON = '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"></polygon></svg>';
+      const PAUSE_ICON = '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+
+      const rEls = {
+        cardMap: $('radar-card-map'), cardMapWrap: $('radar-card-map-wrap'),
+        cardTime: $('radar-card-time'), cardLive: $('radar-live-badge'), cardProgress: $('radar-card-progress'),
+        btnPlay: $('btn-radar-play'), btnExpand: $('btn-radar-expand'),
+        modal: $('radar-fullscreen-modal'), modalMap: $('radar-modal-map'),
+        modalTime: $('radar-modal-time'), modalLive: $('radar-modal-live-badge'), modalSlider: $('radar-modal-slider'),
+        btnModalPlay: $('btn-radar-modal-play'), btnModalPrev: $('btn-radar-modal-prev'), btnModalNext: $('btn-radar-modal-next'),
+        btnZoomIn: $('btn-radar-modal-zoom-in'), btnZoomOut: $('btn-radar-modal-zoom-out'),
+        btnRecenter: $('btn-radar-modal-recenter'), btnClose: $('btn-radar-modal-close'),
+      };
+
+      const ctx = {
+        cardMap: null, modalMap: null, host: 'https://tilecache.rainviewer.com', frames: [], frameIdx: 0,
+        isPlaying: true, cardLayers: new Map(), modalLayers: new Map(), activeCardLayer: null, activeModalLayer: null,
+        timer: null, modalOpen: false, timezone: 'America/Los_Angeles', loadToken: 0,
+        tileSize: (window.devicePixelRatio || 1) >= 2 ? 512 : 256,
+
+        makeMarker(showLbl) {
+          return window.L.divIcon({
+            className: 'radar-morro-marker-wrap',
+            html: `<div class="radar-morro-dot"></div>${showLbl ? '<span class="radar-morro-label">Morro Bay</span>' : ''}`,
+            iconSize: [16, 16], iconAnchor: [8, 8],
+          });
+        },
+        initCardMap() {
+          if (!rEls.cardMap || this.cardMap || !window.L) return;
+          this.cardMap = window.L.map(rEls.cardMap, {
+            center: MORRO_BAY, zoom: 7, minZoom: 5, maxZoom: 10,
+            zoomControl: false, attributionControl: false, scrollWheelZoom: false, boxZoom: false, keyboard: false,
+          });
+          window.L.tileLayer(BASEMAP_URL, { subdomains: 'abcd', maxZoom: 19 }).addTo(this.cardMap);
+          window.L.marker(MORRO_BAY, { icon: this.makeMarker(false), interactive: false, zIndexOffset: 500 }).addTo(this.cardMap);
+        },
+        initModalMap() {
+          if (!rEls.modalMap || !window.L) return;
+          if (this.modalMap) { this.modalMap.invalidateSize(); return; }
+          this.modalMap = window.L.map(rEls.modalMap, {
+            center: MORRO_BAY, zoom: 7, minZoom: 4, maxZoom: 11, zoomControl: false, attributionControl: false,
+          });
+          window.L.tileLayer(BASEMAP_URL, { subdomains: 'abcd', maxZoom: 19 }).addTo(this.modalMap);
+          window.L.marker(MORRO_BAY, { icon: this.makeMarker(true), interactive: false, zIndexOffset: 500 }).addTo(this.modalMap);
+        },
+        pruneLayers(map, cache) {
+          if (!map) { cache.clear(); return; }
+          const valid = new Set(this.frames.map((f) => f.path));
+          for (const [path, layer] of cache.entries()) {
+            if (!valid.has(path)) {
+              if (map.hasLayer(layer)) map.removeLayer(layer);
+              if (this.activeCardLayer === layer) this.activeCardLayer = null;
+              if (this.activeModalLayer === layer) this.activeModalLayer = null;
+              cache.delete(path);
+            }
+          }
+        },
+        ensureLayer(map, cache, frame) {
+          if (!map || !frame) return Promise.resolve(null);
+          if (cache.has(frame.path)) return Promise.resolve(cache.get(frame.path));
+          const layer = window.L.tileLayer(`${this.host}${frame.path}/${this.tileSize}/{z}/{x}/{y}/2/1_1.png`, {
+            tileSize: 256, opacity: 0, maxNativeZoom: 7, maxZoom: 12, zIndex: 10,
+          });
+          cache.set(frame.path, layer);
+          return new Promise((resolve) => {
+            let doneFlag = false;
+            const done = () => { if (doneFlag) return; doneFlag = true; clearTimeout(t); resolve(layer); };
+            const t = setTimeout(done, 2500);
+            layer.once('load', done);
+            layer.addTo(map);
+          });
+        },
+        wrapIdx(i) { const n = this.frames.length; return n ? ((i % n) + n) % n : 0; },
+        fmtTime(ep) {
+          try { return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: this.timezone || undefined }).format(new Date(ep * 1000)); }
+          catch { return new Date(ep * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+        },
+        updateUi(idx) {
+          const f = this.frames[idx];
+          if (!f) return;
+          const isLatest = idx === this.frames.length - 1;
+          const ts = this.fmtTime(f.time);
+          const age = Math.max(0, Math.round((this.frames[this.frames.length - 1].time - f.time) / 60));
+          if (rEls.cardTime) rEls.cardTime.textContent = ts;
+          if (rEls.modalTime) rEls.modalTime.textContent = isLatest ? `${ts} · Latest` : `${ts} · -${age}m`;
+          if (rEls.cardLive) { rEls.cardLive.classList.toggle('is-live', isLatest); rEls.cardLive.textContent = isLatest ? 'LIVE' : `-${age}m`; }
+          if (rEls.modalLive) { rEls.modalLive.classList.toggle('is-live', isLatest); rEls.modalLive.textContent = isLatest ? 'LIVE' : `-${age} MIN`; }
+          const pct = this.frames.length > 1 ? (idx / (this.frames.length - 1)) * 100 : 100;
+          if (rEls.cardProgress) rEls.cardProgress.style.width = `${pct.toFixed(1)}%`;
+          if (rEls.modalSlider) rEls.modalSlider.value = String(idx);
+        },
+        updateBtns() {
+          if (rEls.btnPlay) {
+            rEls.btnPlay.innerHTML = this.isPlaying ? PAUSE_ICON : PLAY_ICON;
+            rEls.btnPlay.title = this.isPlaying ? 'Pause radar loop' : 'Play radar loop';
+          }
+          if (rEls.btnModalPlay) {
+            rEls.btnModalPlay.innerHTML = this.isPlaying ? `${PAUSE_ICON}<span>Pause</span>` : `${PLAY_ICON}<span>Play</span>`;
+          }
+        },
+        async showFrame(targetIdx) {
+          if (!this.frames.length) return;
+          const idx = this.wrapIdx(targetIdx);
+          const frame = this.frames[idx];
+          const tok = ++this.loadToken;
+          this.frameIdx = idx;
+          this.updateUi(idx);
+          const map = this.modalOpen && this.modalMap ? this.modalMap : this.cardMap;
+          const cache = this.modalOpen && this.modalMap ? this.modalLayers : this.cardLayers;
+          const layer = await this.ensureLayer(map, cache, frame);
+          if (tok !== this.loadToken) return;
+          if (this.modalOpen && this.modalMap) {
+            if (this.activeModalLayer && this.activeModalLayer !== layer) this.activeModalLayer.setOpacity(0);
+            if (layer) { layer.setOpacity(0.78); this.activeModalLayer = layer; }
+          } else if (this.cardMap) {
+            if (this.activeCardLayer && this.activeCardLayer !== layer) this.activeCardLayer.setOpacity(0);
+            if (layer) { layer.setOpacity(0.78); this.activeCardLayer = layer; }
+          }
+        },
+        clearTimer() { if (this.timer) { clearTimeout(this.timer); this.timer = null; } },
+        scheduleNext(ms) {
+          this.clearTimer();
+          if (!this.isPlaying || !this.frames.length) return;
+          this.timer = setTimeout(async () => {
+            if (!this.isPlaying) return;
+            const next = this.wrapIdx(this.frameIdx + 1);
+            await this.showFrame(next);
+            if (this.isPlaying) this.scheduleNext(next === this.frames.length - 1 ? 1600 : 650);
+          }, ms);
+        },
+        play() { this.isPlaying = true; this.updateBtns(); this.scheduleNext(650); },
+        stop() { this.isPlaying = false; this.clearTimer(); this.updateBtns(); },
+        toggle() { if (this.isPlaying) this.stop(); else this.play(); },
+        openFullView() {
+          if (!rEls.modal) return;
+          this.modalOpen = true;
+          rEls.modal.classList.remove('hidden');
+          this.initModalMap();
+          if (this.modalMap) { setTimeout(() => { this.modalMap.invalidateSize(); this.showFrame(this.frameIdx); }, 40); }
+          if (this.isPlaying) this.scheduleNext(650);
+          this.updateBtns();
+        },
+        closeFullView() {
+          if (!rEls.modal) return;
+          this.modalOpen = false;
+          rEls.modal.classList.add('hidden');
+          if (this.cardMap) { this.cardMap.invalidateSize(); this.showFrame(this.frameIdx); }
+          if (this.isPlaying) this.scheduleNext(650);
+        },
+        async fetchFrames() {
+          try {
+            const res = await fetch(API_URL, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            const past = Array.isArray(json && json.radar && json.radar.past) ? json.radar.past : [];
+            if (!past.length) throw new Error('No frames');
+            this.host = json.host || 'https://tilecache.rainviewer.com';
+            this.frames = past;
+            this.pruneLayers(this.cardMap, this.cardLayers);
+            this.pruneLayers(this.modalMap, this.modalLayers);
+            if (rEls.modalSlider) rEls.modalSlider.max = String(Math.max(0, past.length - 1));
+            await this.showFrame(past.length - 1);
+            if (this.isPlaying) this.scheduleNext(1600);
+          } catch {
+            if (!this.frames.length && rEls.cardTime) rEls.cardTime.textContent = 'Offline';
+          }
+        },
+        setTimezone(tz) { if (tz) this.timezone = tz; },
+        invalidateSize() {
+          if (this.cardMap) this.cardMap.invalidateSize();
+          if (this.modalOpen && this.modalMap) this.modalMap.invalidateSize();
+        },
+        init() {
+          if (rEls.btnPlay) rEls.btnPlay.addEventListener('click', (e) => { e.stopPropagation(); this.toggle(); });
+          if (rEls.btnExpand) rEls.btnExpand.addEventListener('click', (e) => { e.stopPropagation(); this.openFullView(); });
+          if (rEls.cardMapWrap) rEls.cardMapWrap.addEventListener('dblclick', () => this.openFullView());
+          if (rEls.btnModalPlay) rEls.btnModalPlay.addEventListener('click', () => this.toggle());
+          if (rEls.btnModalPrev) rEls.btnModalPrev.addEventListener('click', () => { this.stop(); this.showFrame(this.frameIdx - 1); });
+          if (rEls.btnModalNext) rEls.btnModalNext.addEventListener('click', () => { this.stop(); this.showFrame(this.frameIdx + 1); });
+          if (rEls.btnZoomIn) rEls.btnZoomIn.addEventListener('click', () => this.modalMap && this.modalMap.zoomIn());
+          if (rEls.btnZoomOut) rEls.btnZoomOut.addEventListener('click', () => this.modalMap && this.modalMap.zoomOut());
+          if (rEls.btnRecenter) rEls.btnRecenter.addEventListener('click', () => this.modalMap && this.modalMap.setView(MORRO_BAY, 7, { animate: true }));
+          if (rEls.btnClose) rEls.btnClose.addEventListener('click', () => this.closeFullView());
+          if (rEls.modal) rEls.modal.addEventListener('click', (e) => { if (e.target === rEls.modal) this.closeFullView(); });
+          if (rEls.modalSlider) rEls.modalSlider.addEventListener('input', (e) => { this.stop(); const idx = Number(e.target.value); if (!Number.isNaN(idx)) this.showFrame(idx); });
+          window.addEventListener('resize', () => this.invalidateSize());
+          if (!window.L) { if (rEls.cardTime) rEls.cardTime.textContent = 'Map N/A'; return; }
+          this.initCardMap();
+          this.fetchFrames();
+          setInterval(() => this.fetchFrames(), 300000);
+        },
+      };
+      return ctx;
+    })();
 
     els.btnUnits.addEventListener('click', () => {
       state.units = state.units === 'imperial' ? 'metric' : 'imperial';
@@ -2758,6 +3126,7 @@
       closeModal(); loadData(true);
     });
 
+    radarCtrl.init();
     updateClock();
     loadData(false);
     setInterval(() => { updateClock(); updateRelativeTime(); }, 1000);
