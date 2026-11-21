@@ -822,11 +822,32 @@
     }
 
     const safeStore = {
+      readCookie(k) {
+        try {
+          const parts = (document.cookie || '').split(';');
+          for (const part of parts) {
+            const idx = part.indexOf('=');
+            if (idx === -1) continue;
+            if (part.slice(0, idx).trim() === k) return decodeURIComponent(part.slice(idx + 1).trim());
+          }
+        } catch {}
+        return null;
+      },
+      writeCookie(k, v, days = 365) {
+        try {
+          const expires = new Date(Date.now() + days * 86400000).toUTCString();
+          const attrs = typeof location !== 'undefined' && location.protocol === 'https:' ? '; SameSite=None; Secure' : '; SameSite=Lax';
+          document.cookie = `${k}=${encodeURIComponent(v)}; expires=${expires}; path=/${attrs}`;
+        } catch {}
+      },
       get(k, fallback) {
-        try { const v = window.localStorage.getItem(k); return v !== null ? v : fallback; } catch { return fallback; }
+        try { const v = window.localStorage.getItem(k); if (v !== null) return v; } catch {}
+        const cv = this.readCookie(k);
+        return cv !== null ? cv : fallback;
       },
       set(k, v) {
         try { window.localStorage.setItem(k, v); } catch {}
+        if (k === 'tempest_gs_avatar_autoplay') this.writeCookie(k, v);
       },
     };
 
@@ -2504,10 +2525,10 @@
             this.speak();
           }
         };
-        document.addEventListener('pointerdown', onFirstGesture, true);
+        document.addEventListener('click', onFirstGesture, true);
         document.addEventListener('keydown', onFirstGesture, true);
         this.gestureUnlockCleanup = () => {
-          document.removeEventListener('pointerdown', onFirstGesture, true);
+          document.removeEventListener('click', onFirstGesture, true);
           document.removeEventListener('keydown', onFirstGesture, true);
         };
       },
@@ -2586,7 +2607,7 @@
             this.clearStartupWatchdog();
             try { window.speechSynthesis.cancel(); } catch {}
             this.currentUtterance = null;
-            this.setSpeakingState(false, 'READY · TAP ANYWHERE TO PLAY');
+            this.setSpeakingState(false, 'AUTO-AUDIO BLOCKED · TAP TO PLAY');
             this.armGestureUnlock();
           };
           utt.onstart = () => {

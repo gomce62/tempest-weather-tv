@@ -700,19 +700,48 @@ export class WeatherAvatarController {
     });
   }
 
+  _readAutoPlayCookie() {
+    if (typeof document === 'undefined') return null;
+    try {
+      const parts = (document.cookie || '').split(';');
+      for (const part of parts) {
+        const idx = part.indexOf('=');
+        if (idx === -1) continue;
+        if (part.slice(0, idx).trim() === this.autoplayStorageKey) {
+          return decodeURIComponent(part.slice(idx + 1).trim());
+        }
+      }
+    } catch {}
+    return null;
+  }
+
+  _writeAutoPlayCookie(enabled) {
+    if (typeof document === 'undefined') return;
+    try {
+      const val = enabled ? 'true' : 'false';
+      const expires = new Date(Date.now() + 365 * 86400000).toUTCString();
+      const isHttps = typeof location !== 'undefined' && location.protocol === 'https:';
+      const attrs = isHttps ? '; SameSite=None; Secure' : '; SameSite=Lax';
+      document.cookie = `${this.autoplayStorageKey}=${encodeURIComponent(val)}; expires=${expires}; path=/${attrs}`;
+    } catch {}
+  }
+
   isAutoPlayEnabled() {
     try {
       const val = localStorage.getItem(this.autoplayStorageKey);
-      return val === null ? true : val === 'true';
-    } catch {
-      return true;
-    }
+      if (val !== null) return val === 'true';
+    } catch {}
+    const cookieVal = this._readAutoPlayCookie();
+    if (cookieVal !== null) return cookieVal === 'true';
+    return true;
   }
 
   setAutoPlayEnabled(enabled) {
+    const val = enabled ? 'true' : 'false';
     try {
-      localStorage.setItem(this.autoplayStorageKey, enabled ? 'true' : 'false');
+      localStorage.setItem(this.autoplayStorageKey, val);
     } catch {}
+    this._writeAutoPlayCookie(Boolean(enabled));
   }
 
   _installGlobalNativeHooks() {
@@ -968,10 +997,10 @@ export class WeatherAvatarController {
         this.speak();
       }
     };
-    document.addEventListener('pointerdown', onFirstGesture, true);
+    document.addEventListener('click', onFirstGesture, true);
     document.addEventListener('keydown', onFirstGesture, true);
     this._gestureUnlockCleanup = () => {
-      document.removeEventListener('pointerdown', onFirstGesture, true);
+      document.removeEventListener('click', onFirstGesture, true);
       document.removeEventListener('keydown', onFirstGesture, true);
     };
   }
@@ -1112,7 +1141,7 @@ export class WeatherAvatarController {
           window.speechSynthesis.cancel();
         } catch {}
         this.currentUtterance = null;
-        this._setSpeakingState(false, 'READY · TAP ANYWHERE TO PLAY');
+        this._setSpeakingState(false, 'AUTO-AUDIO BLOCKED · TAP TO PLAY');
         this._armGestureUnlock();
       };
 
