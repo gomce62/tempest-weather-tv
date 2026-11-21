@@ -642,6 +642,7 @@
       background: rgba(148, 163, 184, 0.14); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.25); white-space: nowrap;
     }
     .radar-live-badge.is-live { background: rgba(74, 222, 128, 0.14); color: #86efac; border-color: rgba(74, 222, 128, 0.35); }
+    .radar-live-badge.is-forecast { background: rgba(245, 158, 11, 0.16); color: #fcd34d; border-color: rgba(245, 158, 11, 0.4); }
     .radar-time-pill { font-size: 13px; font-weight: 500; color: #e2e8f0; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .radar-mini-btn {
       width: 28px; height: 28px; border-radius: 6px; border: 1px solid #323742; background: rgba(255, 255, 255, 0.06);
@@ -662,7 +663,8 @@
       border-radius: 5px; padding: 2px 8px; font-size: 13px; font-weight: 500; white-space: nowrap;
     }
     .radar-progress-track { height: 3.5px; width: 100%; border-radius: 999px; background: #252830; overflow: hidden; flex-shrink: 0; }
-    .radar-progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #38bdf8, #60aeff); transition: width 0.25s ease; }
+    .radar-progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #38bdf8, #60aeff); transition: width 0.25s ease, background 0.25s ease; }
+    .radar-progress-fill.is-forecast { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
     .radar-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0; font-size: 11px; color: var(--text-muted); }
     .radar-legend { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
     .radar-legend-bar {
@@ -691,7 +693,8 @@
     .radar-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-shrink: 0; }
     .radar-modal-playback { display: flex; align-items: center; gap: 10px; }
     .radar-modal-progress-wrap { width: 340px; height: 6px; border-radius: 999px; background: #262a34; overflow: hidden; }
-    .radar-modal-progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #38bdf8, #60aeff); transition: width 0.25s ease; }
+    .radar-modal-progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #38bdf8, #60aeff); transition: width 0.25s ease, background 0.25s ease; }
+    .radar-modal-progress-fill.is-forecast { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
     .radar-modal-meta-right { display: flex; align-items: center; gap: 18px; font-size: 13px; color: var(--text-muted); }
   </style>
 </head>
@@ -913,7 +916,7 @@
               <span class="radar-legend-bar" aria-hidden="true"></span>
               <span>Heavy</span>
             </div>
-            <span class="radar-attribution">Weather data by RainViewer</span>
+            <span class="radar-attribution">RainViewer + Visual Crossing</span>
           </div>
         </article>
       </section>
@@ -1053,7 +1056,7 @@
               <span class="radar-legend-bar" aria-hidden="true"></span>
               <span>Heavy</span>
             </div>
-            <span>Weather data by RainViewer &middot; &copy; OpenStreetMap &middot; Remote: &larr;/&rarr; Button &middot; OK Select &middot; Back Close</span>
+            <span>Radar by RainViewer &amp; Visual Crossing &middot; &copy; OpenStreetMap &middot; Remote: &larr;/&rarr; Button &middot; OK Select &middot; Back Close</span>
           </div>
         </div>
       </div>
@@ -2487,9 +2490,11 @@
       if (els.avatarModal) els.avatarModal.classList.add('hidden');
     }
 
-    /* ---------- Morro Bay Doppler Radar (RainViewer API + Leaflet) ---------- */
+    /* ---------- Morro Bay Doppler Radar (RainViewer + Visual Crossing Forecast + Leaflet) ---------- */
     const radarCtrl = (function () {
       const API_URL = 'https://api.rainviewer.com/public/weather-maps.json';
+      const VC_TILE_BASE = 'https://maps.visualcrossing.com/VisualCrossingWebServices/rest/api/v1/map/tile/precipcomposite';
+      const TRANSPARENT_TILE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
       const MORRO_BAY = [35.3658, -120.85];
       const BASEMAP_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
       const PLAY_ICON = '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"></polygon></svg>';
@@ -2507,7 +2512,7 @@
       };
 
       const ctx = {
-        cardMap: null, modalMap: null, host: 'https://tilecache.rainviewer.com', frames: [], frameIdx: 0,
+        cardMap: null, modalMap: null, host: 'https://tilecache.rainviewer.com', frames: [], liveIdx: -1, frameIdx: 0,
         isPlaying: true, cardLayers: new Map(), modalLayers: new Map(), activeCardLayer: null, activeModalLayer: null,
         timer: null, modalOpen: false, timezone: 'America/Los_Angeles', loadToken: 0,
         tileSize: (window.devicePixelRatio || 1) >= 2 ? 512 : 256,
@@ -2539,23 +2544,23 @@
         },
         pruneLayers(map, cache) {
           if (!map) { cache.clear(); return; }
-          const valid = new Set(this.frames.map((f) => f.path));
-          for (const [path, layer] of cache.entries()) {
-            if (!valid.has(path)) {
+          const valid = new Set(this.frames.map((f) => f.key));
+          for (const [key, layer] of cache.entries()) {
+            if (!valid.has(key)) {
               if (map.hasLayer(layer)) map.removeLayer(layer);
               if (this.activeCardLayer === layer) this.activeCardLayer = null;
               if (this.activeModalLayer === layer) this.activeModalLayer = null;
-              cache.delete(path);
+              cache.delete(key);
             }
           }
         },
         ensureLayer(map, cache, frame) {
           if (!map || !frame) return Promise.resolve(null);
-          if (cache.has(frame.path)) return Promise.resolve(cache.get(frame.path));
-          const layer = window.L.tileLayer(`${this.host}${frame.path}/${this.tileSize}/{z}/{x}/{y}/2/1_1.png`, {
-            tileSize: 256, opacity: 0, maxNativeZoom: 7, maxZoom: 12, zIndex: 10,
-          });
-          cache.set(frame.path, layer);
+          if (cache.has(frame.key)) return Promise.resolve(cache.get(frame.key));
+          const opts = { tileSize: 256, opacity: 0, maxNativeZoom: frame.maxNativeZoom || 7, maxZoom: 12, zIndex: 10 };
+          if (frame.errorTileUrl) opts.errorTileUrl = frame.errorTileUrl;
+          const layer = window.L.tileLayer(frame.tileUrl, opts);
+          cache.set(frame.key, layer);
           return new Promise((resolve) => {
             let doneFlag = false;
             const done = () => { if (doneFlag) return; doneFlag = true; clearTimeout(t); resolve(layer); };
@@ -2572,13 +2577,23 @@
         updateUi(idx) {
           const f = this.frames[idx];
           if (!f) return;
-          const isLatest = idx === this.frames.length - 1;
+          const isLive = Boolean(f.isLive);
+          const isForecast = Boolean(f.isForecast);
           const ts = this.fmtTime(f.time);
-          const age = Math.max(0, Math.round((this.frames[this.frames.length - 1].time - f.time) / 60));
           if (rEls.cardTime) rEls.cardTime.textContent = ts;
-          if (rEls.modalTime) rEls.modalTime.textContent = isLatest ? `${ts} · Latest` : `${ts} · -${age}m`;
-          if (rEls.cardLive) { rEls.cardLive.classList.toggle('is-live', isLatest); rEls.cardLive.textContent = isLatest ? 'LIVE' : `-${age}m`; }
-          if (rEls.modalLive) { rEls.modalLive.classList.toggle('is-live', isLatest); rEls.modalLive.textContent = isLatest ? 'LIVE' : `-${age} MIN`; }
+          if (rEls.modalTime) rEls.modalTime.textContent = isLive ? `${ts} · Live Radar` : isForecast ? `${ts} · Forecast (+${f.offsetMin}m)` : `${ts} · -${f.offsetMin}m`;
+          if (rEls.cardLive) {
+            rEls.cardLive.classList.toggle('is-live', isLive);
+            rEls.cardLive.classList.toggle('is-forecast', isForecast);
+            rEls.cardLive.textContent = isLive ? 'LIVE' : isForecast ? `+${f.offsetMin}m` : `-${f.offsetMin}m`;
+          }
+          if (rEls.modalLive) {
+            rEls.modalLive.classList.toggle('is-live', isLive);
+            rEls.modalLive.classList.toggle('is-forecast', isForecast);
+            rEls.modalLive.textContent = isLive ? 'LIVE' : isForecast ? `FORECAST +${f.offsetMin}m` : `-${f.offsetMin} MIN`;
+          }
+          if (rEls.cardProgress) rEls.cardProgress.classList.toggle('is-forecast', isForecast);
+          if (rEls.modalProgress) rEls.modalProgress.classList.toggle('is-forecast', isForecast);
           const pct = this.frames.length > 1 ? (idx / (this.frames.length - 1)) * 100 : 100;
           if (rEls.cardProgress) rEls.cardProgress.style.width = `${pct.toFixed(1)}%`;
           if (rEls.modalProgress) rEls.modalProgress.style.width = `${pct.toFixed(1)}%`;
@@ -2619,7 +2634,10 @@
             if (!this.isPlaying) return;
             const next = this.wrapIdx(this.frameIdx + 1);
             await this.showFrame(next);
-            if (this.isPlaying) this.scheduleNext(next === this.frames.length - 1 ? 1600 : 650);
+            if (this.isPlaying) {
+              const wait = next === this.frames.length - 1 ? 1600 : next === this.liveIdx ? 1400 : 650;
+              this.scheduleNext(wait);
+            }
           }, ms);
         },
         play() { this.isPlaying = true; this.updateBtns(); this.scheduleNext(650); },
@@ -2654,22 +2672,62 @@
           if (this.isPlaying) this.scheduleNext(650);
           applyTvFocus();
         },
+        buildFutureFrames(anchorEpoch) {
+          const out = [];
+          const stepSec = 15 * 60;
+          const baseFuture = Math.round((anchorEpoch + stepSec) / stepSec) * stepSec;
+          for (let k = 0; k < 4; k++) {
+            const ft = baseFuture + k * stepSec;
+            const iso = new Date(ft * 1000).toISOString().slice(0, 16);
+            out.push({
+              key: `vc_${iso}`, time: ft, isLive: false, isForecast: true,
+              offsetMin: Math.max(5, Math.round((ft - anchorEpoch) / 60)),
+              tileUrl: `${VC_TILE_BASE}/{z}/{x}/{y}.webp?time=${encodeURIComponent(iso)}&unitGroup=us`,
+              maxNativeZoom: 12, errorTileUrl: TRANSPARENT_TILE,
+            });
+          }
+          return out;
+        },
         async fetchFrames() {
+          let combined = [];
+          let liveIdx = -1;
+          let anchorEpoch = Math.floor(Date.now() / 1000);
           try {
             const res = await fetch(API_URL, { cache: 'no-store' });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const json = await res.json();
-            const past = Array.isArray(json && json.radar && json.radar.past) ? json.radar.past : [];
-            if (!past.length) throw new Error('No frames');
-            this.host = json.host || 'https://tilecache.rainviewer.com';
-            this.frames = past;
-            this.pruneLayers(this.cardMap, this.cardLayers);
-            this.pruneLayers(this.modalMap, this.modalLayers);
-            await this.showFrame(past.length - 1);
-            if (this.isPlaying) this.scheduleNext(1600);
-          } catch {
-            if (!this.frames.length && rEls.cardTime) rEls.cardTime.textContent = 'Offline';
+            if (res.ok) {
+              const json = await res.json();
+              const past = Array.isArray(json && json.radar && json.radar.past) ? json.radar.past : [];
+              if (past.length) {
+                this.host = json.host || 'https://tilecache.rainviewer.com';
+                anchorEpoch = past[past.length - 1].time || anchorEpoch;
+                combined = past.map((f, i) => ({
+                  key: `rv_${f.path}`, time: f.time, isLive: i === past.length - 1, isForecast: false,
+                  offsetMin: Math.max(0, Math.round((anchorEpoch - f.time) / 60)),
+                  tileUrl: `${this.host}${f.path}/${this.tileSize}/{z}/{x}/{y}/2/1_1.png`, maxNativeZoom: 7,
+                }));
+                liveIdx = past.length - 1;
+              }
+            }
+          } catch {}
+          const future = this.buildFutureFrames(anchorEpoch);
+          if (!combined.length && future.length) {
+            const liveIso = new Date(anchorEpoch * 1000).toISOString().slice(0, 16);
+            combined.push({
+              key: `vc_live_${liveIso}`, time: anchorEpoch, isLive: true, isForecast: false, offsetMin: 0,
+              tileUrl: `${VC_TILE_BASE}/{z}/{x}/{y}.webp?time=latest&unitGroup=us`,
+              maxNativeZoom: 12, errorTileUrl: TRANSPARENT_TILE,
+            });
+            liveIdx = 0;
           }
+          combined = combined.concat(future);
+          if (!combined.length) { if (!this.frames.length && rEls.cardTime) rEls.cardTime.textContent = 'Offline'; return; }
+          this.frames = combined;
+          this.liveIdx = liveIdx;
+          this.pruneLayers(this.cardMap, this.cardLayers);
+          this.pruneLayers(this.modalMap, this.modalLayers);
+          const startIdx = liveIdx >= 0 ? liveIdx : 0;
+          await this.showFrame(startIdx);
+          if (this.isPlaying) this.scheduleNext(1400);
         },
         setTimezone(tz) { if (tz) this.timezone = tz; },
         init() {

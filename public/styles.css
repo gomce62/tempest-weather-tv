@@ -1651,6 +1651,12 @@ body {
   border-color: rgba(74, 222, 128, 0.35);
 }
 
+.radar-live-badge.is-forecast {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
 .radar-time-pill {
   font-size: 11px;
   font-weight: 500;
@@ -1744,7 +1750,11 @@ body {
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, #38bdf8, #58a6ff);
-  transition: width 0.25s ease;
+  transition: width 0.25s ease, background 0.25s ease;
+}
+
+.radar-progress-fill.is-forecast {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
 }
 
 .radar-card-footer {

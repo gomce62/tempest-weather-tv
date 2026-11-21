@@ -4,12 +4,17 @@
  */
 
 const RAINVIEWER_API_URL = 'https://api.rainviewer.com/public/weather-maps.json';
+const VC_TILE_BASE = 'https://maps.visualcrossing.com/VisualCrossingWebServices/rest/api/v1/map/tile/precipcomposite';
+const TRANSPARENT_TILE_FALLBACK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 const MORRO_BAY_COORDS = [35.3658, -120.85];
 const CARD_DEFAULT_ZOOM = 7;
 const MODAL_DEFAULT_ZOOM = 7;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // RainViewer refreshes every 5 minutes
 const FRAME_DELAY_MS = 650;
-const LATEST_FRAME_DWELL_MS = 1600;
+const LATEST_FRAME_DWELL_MS = 1400;
+const FORECAST_END_DWELL_MS = 1600;
+const FUTURE_STEP_SEC = 15 * 60;
+const FUTURE_FRAME_COUNT = 4; // +15m, +30m, +45m, +60m forecast
 const RADAR_OPACITY = 0.78;
 const DARK_BASEMAP_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
@@ -20,6 +25,7 @@ export class MorroBayRadarController {
     this.modalMap = null;
     this.host = 'https://tilecache.rainviewer.com';
     this.frames = [];
+    this.liveIdx = -1;
     this.frameIdx = 0;
     this.isPlaying = true;
     this.cardLayers = new Map();
@@ -191,35 +197,92 @@ export class MorroBayRadarController {
     }
   }
 
+  buildFutureForecastFrames(anchorEpoch) {
+    const frames = [];
+    const baseFuture = Math.round((anchorEpoch + FUTURE_STEP_SEC) / FUTURE_STEP_SEC) * FUTURE_STEP_SEC;
+    for (let k = 0; k < FUTURE_FRAME_COUNT; k++) {
+      const ft = baseFuture + k * FUTURE_STEP_SEC;
+      const isoUtc = new Date(ft * 1000).toISOString().slice(0, 16);
+      const offsetMin = Math.max(5, Math.round((ft - anchorEpoch) / 60));
+      frames.push({
+        key: `vc_${isoUtc}`,
+        time: ft,
+        isLive: false,
+        isForecast: true,
+        offsetMin,
+        tileUrl: `${VC_TILE_BASE}/{z}/{x}/{y}.webp?time=${encodeURIComponent(isoUtc)}&unitGroup=us`,
+        maxNativeZoom: 12,
+        errorTileUrl: TRANSPARENT_TILE_FALLBACK,
+      });
+    }
+    return frames;
+  }
+
   async fetchRadarFrames() {
+    let combined = [];
+    let liveIdx = -1;
+    let anchorEpoch = Math.floor(Date.now() / 1000);
+
     try {
       const res = await fetch(RAINVIEWER_API_URL, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       const past = Array.isArray(json?.radar?.past) ? json.radar.past : [];
-      if (!past.length) throw new Error('No radar frames available');
-
-      this.host = json.host || 'https://tilecache.rainviewer.com';
-      this.frames = past;
-
-      this.pruneUnusedLayers(this.cardMap, this.cardLayers);
-      this.pruneUnusedLayers(this.modalMap, this.modalLayers);
-
-      if (this.els.modalSlider) {
-        this.els.modalSlider.max = String(Math.max(0, this.frames.length - 1));
-      }
-
-      // Start at latest frame, then auto-play loop
-      const startIdx = this.frames.length - 1;
-      await this.showFrame(startIdx);
-      if (this.isPlaying) {
-        this.scheduleNextFrame(LATEST_FRAME_DWELL_MS);
+      if (past.length) {
+        this.host = json.host || 'https://tilecache.rainviewer.com';
+        anchorEpoch = past[past.length - 1].time || anchorEpoch;
+        combined = past.map((f, i) => ({
+          key: `rv_${f.path}`,
+          time: f.time,
+          isLive: i === past.length - 1,
+          isForecast: false,
+          offsetMin: Math.max(0, Math.round((anchorEpoch - f.time) / 60)),
+          tileUrl: `${this.host}${f.path}/${this.tileSize}/{z}/{x}/{y}/2/1_1.png`,
+          maxNativeZoom: 7,
+        }));
+        liveIdx = past.length - 1;
       }
     } catch (err) {
       console.warn('RainViewer radar load warning:', err);
-      if (!this.frames.length) {
-        this.setStatus('Radar unavailable');
-      }
+    }
+
+    // Supplement with +15m..+60m future forecast frames from Visual Crossing (HRRR/NAM/MRMS composite)
+    const futureFrames = this.buildFutureForecastFrames(anchorEpoch);
+    if (!combined.length && futureFrames.length) {
+      const liveIso = new Date(anchorEpoch * 1000).toISOString().slice(0, 16);
+      combined.push({
+        key: `vc_live_${liveIso}`,
+        time: anchorEpoch,
+        isLive: true,
+        isForecast: false,
+        offsetMin: 0,
+        tileUrl: `${VC_TILE_BASE}/{z}/{x}/{y}.webp?time=latest&unitGroup=us`,
+        maxNativeZoom: 12,
+        errorTileUrl: TRANSPARENT_TILE_FALLBACK,
+      });
+      liveIdx = 0;
+    }
+    combined = combined.concat(futureFrames);
+
+    if (!combined.length) {
+      if (!this.frames.length) this.setStatus('Radar unavailable');
+      return;
+    }
+
+    this.frames = combined;
+    this.liveIdx = liveIdx;
+
+    this.pruneUnusedLayers(this.cardMap, this.cardLayers);
+    this.pruneUnusedLayers(this.modalMap, this.modalLayers);
+
+    if (this.els.modalSlider) {
+      this.els.modalSlider.max = String(Math.max(0, this.frames.length - 1));
+    }
+
+    const startIdx = this.liveIdx >= 0 ? this.liveIdx : 0;
+    await this.showFrame(startIdx);
+    if (this.isPlaying) {
+      this.scheduleNextFrame(LATEST_FRAME_DWELL_MS);
     }
   }
 
@@ -228,36 +291,36 @@ export class MorroBayRadarController {
       layerCache.clear();
       return;
     }
-    const validPaths = new Set(this.frames.map((f) => f.path));
-    for (const [path, layer] of layerCache.entries()) {
-      if (!validPaths.has(path)) {
+    const validKeys = new Set(this.frames.map((f) => f.key));
+    for (const [key, layer] of layerCache.entries()) {
+      if (!validKeys.has(key)) {
         if (map.hasLayer(layer)) map.removeLayer(layer);
         if (this.activeCardLayer === layer) this.activeCardLayer = null;
         if (this.activeModalLayer === layer) this.activeModalLayer = null;
-        layerCache.delete(path);
+        layerCache.delete(key);
       }
     }
   }
 
   buildLayer(frame) {
-    // RainViewer Free Weather Maps API: color scheme 2 (Universal Blue), smooth=1, snow=1, maxNativeZoom=7
-    const url = `${this.host}${frame.path}/${this.tileSize}/{z}/{x}/{y}/2/1_1.png`;
-    return window.L.tileLayer(url, {
+    const opts = {
       tileSize: 256,
       opacity: 0,
-      maxNativeZoom: 7,
+      maxNativeZoom: frame.maxNativeZoom || 7,
       maxZoom: 12,
       zIndex: 10,
-    });
+    };
+    if (frame.errorTileUrl) opts.errorTileUrl = frame.errorTileUrl;
+    return window.L.tileLayer(frame.tileUrl, opts);
   }
 
   ensureLayerOnMap(map, layerCache, frame) {
     if (!map || !frame) return Promise.resolve(null);
-    const existing = layerCache.get(frame.path);
+    const existing = layerCache.get(frame.key);
     if (existing) return Promise.resolve(existing);
 
     const layer = this.buildLayer(frame);
-    layerCache.set(frame.path, layer);
+    layerCache.set(frame.key, layer);
 
     return new Promise((resolve) => {
       let settled = false;
@@ -297,31 +360,42 @@ export class MorroBayRadarController {
     if (this.els.modalTimeEl) this.els.modalTimeEl.textContent = text;
     if (this.els.cardLiveBadge) {
       this.els.cardLiveBadge.classList.toggle('is-live', isLatest);
+      this.els.cardLiveBadge.classList.remove('is-forecast');
       this.els.cardLiveBadge.textContent = isLatest ? 'LIVE' : 'PAST';
     }
     if (this.els.modalLiveBadge) {
       this.els.modalLiveBadge.classList.toggle('is-live', isLatest);
-      this.els.modalLiveBadge.textContent = isLatest ? 'LATEST RADAR' : 'PAST RADAR';
+      this.els.modalLiveBadge.classList.remove('is-forecast');
+      this.els.modalLiveBadge.textContent = isLatest ? 'LIVE' : 'PAST';
     }
   }
 
   updateFrameUi(idx) {
     const frame = this.frames[idx];
     if (!frame) return;
-    const isLatest = idx === this.frames.length - 1;
+    const isLive = Boolean(frame.isLive);
+    const isForecast = Boolean(frame.isForecast);
     const timeStr = this.formatFrameTime(frame.time);
-    const ageMins = Math.max(0, Math.round((this.frames[this.frames.length - 1].time - frame.time) / 60));
-    const modalText = isLatest ? `${timeStr} · Latest` : `${timeStr} · -${ageMins}m`;
+    const modalText = isLive
+      ? `${timeStr} · Live Radar`
+      : isForecast
+        ? `${timeStr} · Forecast (+${frame.offsetMin}m)`
+        : `${timeStr} · -${frame.offsetMin}m`;
 
     if (this.els.cardTimeEl) this.els.cardTimeEl.textContent = timeStr;
     if (this.els.modalTimeEl) this.els.modalTimeEl.textContent = modalText;
     if (this.els.cardLiveBadge) {
-      this.els.cardLiveBadge.classList.toggle('is-live', isLatest);
-      this.els.cardLiveBadge.textContent = isLatest ? 'LIVE' : `-${ageMins}m`;
+      this.els.cardLiveBadge.classList.toggle('is-live', isLive);
+      this.els.cardLiveBadge.classList.toggle('is-forecast', isForecast);
+      this.els.cardLiveBadge.textContent = isLive ? 'LIVE' : isForecast ? `+${frame.offsetMin}m` : `-${frame.offsetMin}m`;
     }
     if (this.els.modalLiveBadge) {
-      this.els.modalLiveBadge.classList.toggle('is-live', isLatest);
-      this.els.modalLiveBadge.textContent = isLatest ? 'LIVE' : `-${ageMins} MIN`;
+      this.els.modalLiveBadge.classList.toggle('is-live', isLive);
+      this.els.modalLiveBadge.classList.toggle('is-forecast', isForecast);
+      this.els.modalLiveBadge.textContent = isLive ? 'LIVE' : isForecast ? `FORECAST +${frame.offsetMin}m` : `-${frame.offsetMin} MIN`;
+    }
+    if (this.els.cardProgressFill) {
+      this.els.cardProgressFill.classList.toggle('is-forecast', isForecast);
     }
 
     const pct = this.frames.length > 1 ? (idx / (this.frames.length - 1)) * 100 : 100;
@@ -386,8 +460,10 @@ export class MorroBayRadarController {
       const nextIdx = this.wrapIdx(this.frameIdx + 1);
       await this.showFrame(nextIdx);
       if (this.isPlaying) {
+        const isLive = nextIdx === this.liveIdx;
         const isLast = nextIdx === this.frames.length - 1;
-        this.scheduleNextFrame(isLast ? LATEST_FRAME_DWELL_MS : FRAME_DELAY_MS);
+        const wait = isLast ? FORECAST_END_DWELL_MS : isLive ? LATEST_FRAME_DWELL_MS : FRAME_DELAY_MS;
+        this.scheduleNextFrame(wait);
       }
     }, delayMs);
   }
