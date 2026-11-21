@@ -978,8 +978,14 @@ function bindEvents() {
     });
   }
   if (els.avatarAutoplayToggle) {
+    els.avatarAutoplayToggle.checked = avatarController.isAutoPlayEnabled();
     els.avatarAutoplayToggle.addEventListener('change', (e) => {
-      avatarController.setAutoPlayEnabled(Boolean(e.target.checked));
+      const next = Boolean(e.target.checked);
+      state.userToggledAutoplay = true;
+      avatarController.setAutoPlayEnabled(next);
+      if (state.hasServerApi) {
+        saveServerConfig({ avatarAutoplay: next }).catch(() => {});
+      }
     });
   }
 
@@ -1111,6 +1117,12 @@ async function init() {
     if (serverCfg.wsToken) state.wsToken = serverCfg.wsToken;
     if (serverCfg.stationId && !localStorage.getItem(STORAGE_KEYS.stationId)) {
       state.stationId = String(serverCfg.stationId);
+    }
+    if (typeof serverCfg.avatarAutoplay === 'boolean' && !state.userToggledAutoplay) {
+      avatarController.setAutoPlayEnabled(serverCfg.avatarAutoplay);
+      if (els.avatarAutoplayToggle) {
+        els.avatarAutoplayToggle.checked = serverCfg.avatarAutoplay;
+      }
     }
   }
 

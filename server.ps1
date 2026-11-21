@@ -34,10 +34,11 @@ function Load-DotEnv {
 }
 
 function Save-DotEnv {
-    param([string]$Token, [string]$StationId, [int]$ServerPort)
+    param([string]$Token, [string]$StationId, [int]$ServerPort, [string]$AvatarAutoplay = '')
     $existing = Load-DotEnv
     if ($Token) { $existing['TEMPEST_API_TOKEN'] = $Token }
     if ($StationId) { $existing['TEMPEST_STATION_ID'] = $StationId }
+    if ($AvatarAutoplay -eq 'true' -or $AvatarAutoplay -eq 'false') { $existing['TEMPEST_AVATAR_AUTOPLAY'] = $AvatarAutoplay }
     if (-not $existing.ContainsKey('PORT')) { $existing['PORT'] = "$ServerPort" }
 
     $lines = @(
@@ -46,6 +47,9 @@ function Save-DotEnv {
         "TEMPEST_STATION_ID=$($existing['TEMPEST_STATION_ID'])",
         "PORT=$($existing['PORT'])"
     )
+    if ($existing.ContainsKey('TEMPEST_AVATAR_AUTOPLAY')) {
+        $lines += "TEMPEST_AVATAR_AUTOPLAY=$($existing['TEMPEST_AVATAR_AUTOPLAY'])"
+    }
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllLines($EnvPath, $lines, $utf8NoBom)
 }
@@ -814,10 +818,16 @@ try {
                     $cfg = Load-DotEnv
                     $tok = if ($cfg.ContainsKey('TEMPEST_API_TOKEN')) { $cfg['TEMPEST_API_TOKEN'] } else { '' }
                     $sid = if ($cfg.ContainsKey('TEMPEST_STATION_ID') -and $cfg['TEMPEST_STATION_ID']) { $cfg['TEMPEST_STATION_ID'] } else { '218212' }
+                    $apVal = $null
+                    if ($cfg.ContainsKey('TEMPEST_AVATAR_AUTOPLAY')) {
+                        if ($cfg['TEMPEST_AVATAR_AUTOPLAY'] -eq 'false') { $apVal = $false }
+                        elseif ($cfg['TEMPEST_AVATAR_AUTOPLAY'] -eq 'true') { $apVal = $true }
+                    }
                     Send-Json -Response $res -Obj @{
                         hasServerToken = ($tok.Length -gt 0)
                         wsToken = $tok
                         stationId = $sid
+                        avatarAutoplay = $apVal
                     }
                     continue
                 } elseif ($req.HttpMethod -eq 'POST') {
@@ -825,12 +835,25 @@ try {
                     $bodyText = $reader.ReadToEnd()
                     $body = $bodyText | ConvertFrom-Json
                     $tok = if ($body.token) { ([string]$body.token).Trim() } else { '' }
-                    $sid = if ($body.stationId) { ([string]$body.stationId).Trim() } else { '218212' }
-                    Save-DotEnv -Token $tok -StationId $sid -ServerPort $Port
+                    $sid = if ($body.stationId) { ([string]$body.stationId).Trim() } else { '' }
+                    $apStr = ''
+                    if ($null -ne $body.avatarAutoplay) {
+                        $apStr = if ([bool]$body.avatarAutoplay) { 'true' } else { 'false' }
+                    }
+                    Save-DotEnv -Token $tok -StationId $sid -ServerPort $Port -AvatarAutoplay $apStr
+                    $cfg = Load-DotEnv
+                    $finalTok = if ($cfg.ContainsKey('TEMPEST_API_TOKEN')) { $cfg['TEMPEST_API_TOKEN'] } else { '' }
+                    $finalSid = if ($cfg.ContainsKey('TEMPEST_STATION_ID') -and $cfg['TEMPEST_STATION_ID']) { $cfg['TEMPEST_STATION_ID'] } else { '218212' }
+                    $finalAp = $null
+                    if ($cfg.ContainsKey('TEMPEST_AVATAR_AUTOPLAY')) {
+                        if ($cfg['TEMPEST_AVATAR_AUTOPLAY'] -eq 'false') { $finalAp = $false }
+                        elseif ($cfg['TEMPEST_AVATAR_AUTOPLAY'] -eq 'true') { $finalAp = $true }
+                    }
                     Send-Json -Response $res -Obj @{
                         ok = $true
-                        hasServerToken = ($tok.Length -gt 0)
-                        stationId = $sid
+                        hasServerToken = ($finalTok.Length -gt 0)
+                        stationId = $finalSid
+                        avatarAutoplay = $finalAp
                     }
                     continue
                 }

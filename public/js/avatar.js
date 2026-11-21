@@ -700,6 +700,35 @@ export class WeatherAvatarController {
     });
   }
 
+  _readWindowPref() {
+    try {
+      const raw = typeof window !== 'undefined' ? window.name : '';
+      if (raw && raw.startsWith('__tempest_prefs__:')) {
+        const parsed = JSON.parse(raw.slice('__tempest_prefs__:'.length));
+        if (parsed && typeof parsed[this.autoplayStorageKey] === 'string') {
+          return parsed[this.autoplayStorageKey];
+        }
+      }
+    } catch {}
+    return null;
+  }
+
+  _writeWindowPref(val) {
+    try {
+      if (typeof window === 'undefined') return;
+      let parsed = {};
+      if (window.name && window.name.startsWith('__tempest_prefs__:')) {
+        try {
+          parsed = JSON.parse(window.name.slice('__tempest_prefs__:'.length)) || {};
+        } catch {
+          parsed = {};
+        }
+      }
+      parsed[this.autoplayStorageKey] = val;
+      window.name = '__tempest_prefs__:' + JSON.stringify(parsed);
+    } catch {}
+  }
+
   _readAutoPlayCookie() {
     if (typeof document === 'undefined') return null;
     try {
@@ -731,8 +760,14 @@ export class WeatherAvatarController {
       const val = localStorage.getItem(this.autoplayStorageKey);
       if (val !== null) return val === 'true';
     } catch {}
+    try {
+      const sval = sessionStorage.getItem(this.autoplayStorageKey);
+      if (sval !== null) return sval === 'true';
+    } catch {}
     const cookieVal = this._readAutoPlayCookie();
     if (cookieVal !== null) return cookieVal === 'true';
+    const winVal = this._readWindowPref();
+    if (winVal !== null) return winVal === 'true';
     return true;
   }
 
@@ -741,7 +776,11 @@ export class WeatherAvatarController {
     try {
       localStorage.setItem(this.autoplayStorageKey, val);
     } catch {}
+    try {
+      sessionStorage.setItem(this.autoplayStorageKey, val);
+    } catch {}
     this._writeAutoPlayCookie(Boolean(enabled));
+    this._writeWindowPref(val);
   }
 
   _installGlobalNativeHooks() {
@@ -982,7 +1021,7 @@ export class WeatherAvatarController {
     const onFirstGesture = (e) => {
       const target = e.target;
       if (target && typeof target.closest === 'function') {
-        if (target.closest('#avatar-close, #avatar-autoplay-toggle, #avatar-autoplay-btn')) {
+        if (target.closest('#avatar-close, #avatar-autoplay-toggle, .avatar-autoplay-label, #avatar-autoplay-btn')) {
           this._clearGestureUnlock();
           return;
         }

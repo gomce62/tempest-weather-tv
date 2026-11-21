@@ -127,20 +127,26 @@ async function loadDotEnv() {
   return map;
 }
 
-async function saveDotEnv({ token, stationId, port }) {
+async function saveDotEnv({ token, stationId, port, avatarAutoplay }) {
   const existing = await loadDotEnv();
   if (token) existing.TEMPEST_API_TOKEN = token;
   if (stationId) existing.TEMPEST_STATION_ID = stationId;
+  if (typeof avatarAutoplay === 'boolean') {
+    existing.TEMPEST_AVATAR_AUTOPLAY = avatarAutoplay ? 'true' : 'false';
+  }
   if (!existing.PORT) existing.PORT = String(port);
 
-  const out = [
+  const lines = [
     '# WeatherFlow Tempest Dashboard Configuration',
     `TEMPEST_API_TOKEN=${existing.TEMPEST_API_TOKEN || ''}`,
     `TEMPEST_STATION_ID=${existing.TEMPEST_STATION_ID || '218212'}`,
     `PORT=${existing.PORT}`,
-    '',
-  ].join('\n');
-  await fs.writeFile(ENV_PATH, out, 'utf8');
+  ];
+  if (existing.TEMPEST_AVATAR_AUTOPLAY !== undefined) {
+    lines.push(`TEMPEST_AVATAR_AUTOPLAY=${existing.TEMPEST_AVATAR_AUTOPLAY}`);
+  }
+  lines.push('');
+  await fs.writeFile(ENV_PATH, lines.join('\n'), 'utf8');
 }
 
 function degreesToCardinal(deg) {
@@ -718,10 +724,13 @@ const server = http.createServer(async (req, res) => {
       const cfg = await loadDotEnv();
       const token = process.env.TEMPEST_API_TOKEN || cfg.TEMPEST_API_TOKEN || '';
       const stationId = process.env.TEMPEST_STATION_ID || cfg.TEMPEST_STATION_ID || '218212';
+      const rawAp = process.env.TEMPEST_AVATAR_AUTOPLAY ?? cfg.TEMPEST_AVATAR_AUTOPLAY;
+      const avatarAutoplay = rawAp === 'false' ? false : rawAp === 'true' ? true : null;
       return sendJson(res, 200, {
         hasServerToken: Boolean(token),
         wsToken: token,
         stationId,
+        avatarAutoplay,
       });
     }
 
@@ -730,9 +739,16 @@ const server = http.createServer(async (req, res) => {
       for await (const chunk of req) body += chunk;
       const parsed = JSON.parse(body || '{}');
       const token = String(parsed.token || '').trim();
-      const stationId = String(parsed.stationId || '218212').trim();
-      await saveDotEnv({ token, stationId, port: PORT });
-      return sendJson(res, 200, { ok: true, hasServerToken: Boolean(token), stationId });
+      const stationId = String(parsed.stationId || '').trim();
+      const avatarAutoplay = typeof parsed.avatarAutoplay === 'boolean' ? parsed.avatarAutoplay : undefined;
+      await saveDotEnv({ token, stationId, port: PORT, avatarAutoplay });
+      const cfg = await loadDotEnv();
+      return sendJson(res, 200, {
+        ok: true,
+        hasServerToken: Boolean(cfg.TEMPEST_API_TOKEN),
+        stationId: cfg.TEMPEST_STATION_ID || '218212',
+        avatarAutoplay: cfg.TEMPEST_AVATAR_AUTOPLAY === 'false' ? false : cfg.TEMPEST_AVATAR_AUTOPLAY === 'true' ? true : null,
+      });
     }
 
     if (pathname === '/api/dashboard' && req.method === 'GET') {

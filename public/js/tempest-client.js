@@ -477,11 +477,12 @@ export async function fetchServerConfig() {
 /**
  * Saves API token and station ID to server .env (if running via local server).
  */
-export async function saveServerConfig({ token, stationId }) {
+export async function saveServerConfig(payload) {
   const res = await fetch('/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, stationId }),
+    keepalive: true,
+    body: JSON.stringify(payload || {}),
   });
   if (!res.ok) {
     const txt = await res.text();

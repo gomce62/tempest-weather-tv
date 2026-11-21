@@ -863,7 +863,7 @@
           <div id="avatar-script-text" class="avatar-script-box" aria-live="polite">Loading today's forecast briefing...</div>
           <div class="avatar-controls-row">
             <button id="avatar-toggle-speak" class="btn-primary" type="button">Play Briefing</button>
-            <label class="checkbox-row">
+            <label class="checkbox-row avatar-autoplay-label">
               <input id="avatar-autoplay-toggle" type="checkbox" checked />
               <span>Auto-play on launch</span>
             </label>
@@ -986,6 +986,27 @@
     }
 
     const safeStore = {
+      readWinName(k) {
+        try {
+          const raw = typeof window !== 'undefined' ? window.name : '';
+          if (raw && raw.startsWith('__tempest_prefs__:')) {
+            const obj = JSON.parse(raw.slice('__tempest_prefs__:'.length));
+            if (obj && typeof obj[k] === 'string') return obj[k];
+          }
+        } catch {}
+        return null;
+      },
+      writeWinName(k, v) {
+        try {
+          if (typeof window === 'undefined') return;
+          let obj = {};
+          if (window.name && window.name.startsWith('__tempest_prefs__:')) {
+            try { obj = JSON.parse(window.name.slice('__tempest_prefs__:'.length)) || {}; } catch { obj = {}; }
+          }
+          obj[k] = String(v);
+          window.name = '__tempest_prefs__:' + JSON.stringify(obj);
+        } catch {}
+      },
       readCookie(k) {
         try {
           const parts = (document.cookie || '').split(';');
@@ -1006,12 +1027,19 @@
       },
       get(k, fallback) {
         try { const v = window.localStorage.getItem(k); if (v !== null) return v; } catch {}
+        try { const sv = window.sessionStorage.getItem(k); if (sv !== null) return sv; } catch {}
         const cv = this.readCookie(k);
-        return cv !== null ? cv : fallback;
+        if (cv !== null) return cv;
+        const wv = this.readWinName(k);
+        return wv !== null ? wv : fallback;
       },
       set(k, v) {
         try { window.localStorage.setItem(k, v); } catch {}
-        if (k === 'tempest_gs_avatar_autoplay') this.writeCookie(k, v);
+        try { window.sessionStorage.setItem(k, v); } catch {}
+        if (k === 'tempest_gs_avatar_autoplay') {
+          this.writeCookie(k, v);
+          this.writeWinName(k, v);
+        }
       },
     };
 
@@ -1858,6 +1886,10 @@
       if (els.weathermanText) {
         els.weathermanText.textContent = briefingStr;
       }
+      if (data && data.prefs && typeof data.prefs.avatarAutoplay === 'boolean' && !avatarCtrl.userToggledThisSession) {
+        avatarCtrl.setAutoPlayEnabled(data.prefs.avatarAutoplay, true);
+        if (els.avatarAutoplayToggle) els.avatarAutoplayToggle.checked = avatarCtrl.isAutoPlayEnabled();
+      }
       if (!avatarCtrl.autoPlayedOnce && avatarCtrl.isAutoPlayEnabled() && !data.isDemo) {
         avatarCtrl.autoPlayedOnce = true;
         openAvatarBriefing(true);
@@ -2512,11 +2544,22 @@
       speechStartMs: 0,
       currentUtterance: null,
       autoPlayedOnce: false,
+      userToggledThisSession: false,
       hasPlayedOnce: false,
       startupWatchdog: null,
       gestureUnlockCleanup: null,
       isAutoPlayEnabled() { return safeStore.get('tempest_gs_avatar_autoplay', 'true') === 'true'; },
-      setAutoPlayEnabled(val) { safeStore.set('tempest_gs_avatar_autoplay', val ? 'true' : 'false'); },
+      setAutoPlayEnabled(val, skipRemote) {
+        const b = Boolean(val);
+        safeStore.set('tempest_gs_avatar_autoplay', b ? 'true' : 'false');
+        if (!skipRemote && state.proxyUrl) {
+          try {
+            const sep = state.proxyUrl.includes('?') ? '&' : '?';
+            const u = `${state.proxyUrl}${sep}action=setPref&key=avatar_autoplay&value=${b ? 'true' : 'false'}&stationId=${encodeURIComponent(state.stationId)}&_ts=${Date.now()}`;
+            fetch(u, { cache: 'no-store', keepalive: true }).catch(() => {});
+          } catch {}
+        }
+      },
       pickBrowserVoice() {
         if (!('speechSynthesis' in window)) return null;
         const voices = window.speechSynthesis.getVoices() || [];
@@ -2683,7 +2726,7 @@
         const onFirstGesture = (e) => {
           const target = e.target;
           if (target && typeof target.closest === 'function') {
-            if (target.closest('#avatar-close, #avatar-autoplay-toggle')) { this.clearGestureUnlock(); return; }
+            if (target.closest('#avatar-close, #avatar-autoplay-toggle, .avatar-autoplay-label')) { this.clearGestureUnlock(); return; }
             if (target.closest('#avatar-toggle-speak')) { this.clearGestureUnlock(); return; }
           }
           this.clearGestureUnlock();
@@ -2874,7 +2917,13 @@
     if (els.avatarClose) els.avatarClose.addEventListener('click', closeAvatarBriefing);
     if (els.avatarModal) els.avatarModal.addEventListener('click', (e) => { if (e.target === els.avatarModal) closeAvatarBriefing(); });
     if (els.avatarToggleSpeak) els.avatarToggleSpeak.addEventListener('click', () => { if (avatarCtrl.speaking) avatarCtrl.stop(); else avatarCtrl.speak(); });
-    if (els.avatarAutoplayToggle) els.avatarAutoplayToggle.addEventListener('change', (e) => { avatarCtrl.setAutoPlayEnabled(Boolean(e.target.checked)); });
+    if (els.avatarAutoplayToggle) {
+      els.avatarAutoplayToggle.checked = avatarCtrl.isAutoPlayEnabled();
+      els.avatarAutoplayToggle.addEventListener('change', (e) => {
+        avatarCtrl.userToggledThisSession = true;
+        avatarCtrl.setAutoPlayEnabled(Boolean(e.target.checked));
+      });
+    }
 
     els.detailClose.addEventListener('click', closeDayDetail);
     els.detailPrev.addEventListener('click', () => { if (activeDetailDayIdx > 0) openDayDetail(activeDetailDayIdx - 1); });

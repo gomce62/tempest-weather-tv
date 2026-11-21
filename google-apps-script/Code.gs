@@ -134,6 +134,13 @@ function getSecretToken_() {
   return getSecretTokenInfo_().token;
 }
 
+function getAutoPlayPref_(props) {
+  const raw = props.getProperty('PREF_AVATAR_AUTOPLAY');
+  if (raw === 'false') return false;
+  if (raw === 'true') return true;
+  return true;
+}
+
 function doGet(e) {
   try {
     const props = PropertiesService.getScriptProperties();
@@ -141,8 +148,26 @@ function doGet(e) {
     const stationId = String(params.stationId || props.getProperty('TEMPEST_STATION_ID') || '218212').trim();
     const units = params.units === 'metric' ? 'metric' : 'imperial';
 
+    if (params.action === 'setPref') {
+      const key = String(params.key || '').trim();
+      const val = String(params.value || '').trim();
+      if (key === 'avatar_autoplay') {
+        const normalized = val === 'false' ? 'false' : 'true';
+        props.setProperty('PREF_AVATAR_AUTOPLAY', normalized);
+        try {
+          CacheService.getScriptCache().removeAll([
+            'dash_v2_' + stationId + '_imperial',
+            'dash_v2_' + stationId + '_metric',
+          ]);
+        } catch (err) {}
+        return jsonResponse_({ ok: true, key: key, value: normalized === 'true' });
+      }
+      return jsonResponse_({ ok: false, error: 'Unsupported preference key.' });
+    }
+
     const tokenInfo = getSecretTokenInfo_();
     const token = tokenInfo.token;
+    const prefs = { avatarAutoplay: getAutoPlayPref_(props) };
 
     if (params.diag === '1') {
       const diag = {
@@ -151,6 +176,7 @@ function doGet(e) {
         hasToken: Boolean(token),
         tokenSource: tokenInfo.source,
         tokenLength: token ? token.length : 0,
+        prefs: prefs,
       };
       if (token) {
         try {
@@ -178,10 +204,17 @@ function doGet(e) {
     const cacheKey = 'dash_v2_' + stationId + '_' + units;
     const cached = cache.get(cacheKey);
     if (cached) {
-      return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+      try {
+        const cachedObj = JSON.parse(cached);
+        cachedObj.prefs = prefs;
+        return jsonResponse_(cachedObj);
+      } catch (err) {
+        return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+      }
     }
 
     const payload = fetchTempestDashboard_(stationId, token, units);
+    payload.prefs = prefs;
     const out = JSON.stringify(payload);
     try {
       cache.put(cacheKey, out, 30);

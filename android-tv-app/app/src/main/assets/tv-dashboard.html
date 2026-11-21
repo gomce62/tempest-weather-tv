@@ -2023,6 +2023,10 @@
           if (val !== null) return val === 'true';
         } catch {}
         try {
+          const sval = sessionStorage.getItem('tv_avatar_autoplay');
+          if (sval !== null) return sval === 'true';
+        } catch {}
+        try {
           const parts = (document.cookie || '').split(';');
           for (const part of parts) {
             const idx = part.indexOf('=');
@@ -2030,15 +2034,31 @@
             if (part.slice(0, idx).trim() === 'tv_avatar_autoplay') return decodeURIComponent(part.slice(idx + 1).trim()) === 'true';
           }
         } catch {}
+        try {
+          const raw = typeof window !== 'undefined' ? window.name : '';
+          if (raw && raw.startsWith('__tempest_prefs__:')) {
+            const obj = JSON.parse(raw.slice('__tempest_prefs__:'.length));
+            if (obj && typeof obj.tv_avatar_autoplay === 'string') return obj.tv_avatar_autoplay === 'true';
+          }
+        } catch {}
         return true;
       },
       setAutoPlayEnabled(val) {
         const s = val ? 'true' : 'false';
         try { localStorage.setItem('tv_avatar_autoplay', s); } catch {}
+        try { sessionStorage.setItem('tv_avatar_autoplay', s); } catch {}
         try {
           const expires = new Date(Date.now() + 365 * 86400000).toUTCString();
           const attrs = typeof location !== 'undefined' && location.protocol === 'https:' ? '; SameSite=None; Secure' : '; SameSite=Lax';
           document.cookie = `tv_avatar_autoplay=${encodeURIComponent(s)}; expires=${expires}; path=/${attrs}`;
+        } catch {}
+        try {
+          let obj = {};
+          if (window.name && window.name.startsWith('__tempest_prefs__:')) {
+            try { obj = JSON.parse(window.name.slice('__tempest_prefs__:'.length)) || {}; } catch { obj = {}; }
+          }
+          obj.tv_avatar_autoplay = s;
+          window.name = '__tempest_prefs__:' + JSON.stringify(obj);
         } catch {}
         if (els.avatarAutoplayBtn) els.avatarAutoplayBtn.textContent = `Auto-Play: ${val ? 'On' : 'Off'}`;
       },
