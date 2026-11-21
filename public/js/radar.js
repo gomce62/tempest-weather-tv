@@ -11,7 +11,7 @@ const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // RainViewer refreshes every 5 minut
 const FRAME_DELAY_MS = 650;
 const LATEST_FRAME_DWELL_MS = 1600;
 const RADAR_OPACITY = 0.78;
-const DARK_BASEMAP_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const DARK_BASEMAP_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 export class MorroBayRadarController {
   constructor(els) {
@@ -75,8 +75,8 @@ export class MorroBayRadarController {
     });
 
     window.L.tileLayer(DARK_BASEMAP_URL, {
-      subdomains: 'abcd',
       maxZoom: 19,
+      className: 'radar-basemap-tiles',
     }).addTo(this.cardMap);
 
     window.L.marker(MORRO_BAY_COORDS, {
@@ -104,8 +104,8 @@ export class MorroBayRadarController {
     });
 
     window.L.tileLayer(DARK_BASEMAP_URL, {
-      subdomains: 'abcd',
       maxZoom: 19,
+      className: 'radar-basemap-tiles',
     }).addTo(this.modalMap);
 
     window.L.marker(MORRO_BAY_COORDS, {

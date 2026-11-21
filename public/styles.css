@@ -1699,6 +1699,10 @@ body {
   font-family: inherit !important;
 }
 
+.radar-basemap-tiles {
+  filter: invert(100%) hue-rotate(180deg) brightness(82%) contrast(92%) saturate(35%);
+}
+
 .radar-morro-marker-wrap {
   display: flex;
   align-items: center;
