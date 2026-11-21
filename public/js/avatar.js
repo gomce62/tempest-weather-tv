@@ -878,6 +878,7 @@ export class WeatherAvatarController {
     this.scriptEl.innerHTML = this.scriptData.displayWords
       .map((w, i) => `<span class="av-word" data-widx="${i}">${this._escapeHtml(w)}</span>`)
       .join(' ');
+    this.scriptEl.scrollTop = 0;
   }
 
   _escapeHtml(str) {
@@ -974,6 +975,25 @@ export class WeatherAvatarController {
     this.rafId = requestAnimationFrame(step);
   }
 
+  _scrollToActiveWord(wordEl) {
+    const box = this.scriptEl;
+    if (!box || !wordEl) return;
+    const viewH = box.clientHeight;
+    if (!viewH || box.scrollHeight <= viewH + 2) return;
+    const wordTop = wordEl.offsetTop;
+    const wordBottom = wordTop + wordEl.offsetHeight;
+    const viewTop = box.scrollTop;
+    const pad = Math.min(48, viewH * 0.25);
+    if (wordBottom > viewTop + viewH - pad || wordTop < viewTop + pad * 0.4) {
+      const targetScroll = Math.max(0, wordTop - viewH * 0.35);
+      if (typeof box.scrollTo === 'function') {
+        box.scrollTo({ top: targetScroll, behavior: 'smooth' });
+      } else {
+        box.scrollTop = targetScroll;
+      }
+    }
+  }
+
   _highlightWord(idx, queuePhonemes = true) {
     if (!this.scriptEl || idx === this.activeWordIdx) return;
     const prev = this.scriptEl.querySelector('.av-word.is-active');
@@ -981,7 +1001,10 @@ export class WeatherAvatarController {
     this.activeWordIdx = idx;
     if (idx >= 0) {
       const next = this.scriptEl.querySelector(`.av-word[data-widx="${idx}"]`);
-      if (next) next.classList.add('is-active');
+      if (next) {
+        next.classList.add('is-active');
+        this._scrollToActiveWord(next);
+      }
       if (queuePhonemes) {
         const spokenWord = (this.scriptData.spokenWords && this.scriptData.spokenWords[idx]) || this.scriptData.displayWords[idx] || '';
         this.wordPhQueue = { items: wordToPhonemes(spokenWord), idx: 0, elapsed: 0 };
@@ -1117,6 +1140,7 @@ export class WeatherAvatarController {
 
   speak() {
     this.stop();
+    if (this.scriptEl) this.scriptEl.scrollTop = 0;
     this.manualStop = false;
     this._clearAutoClose();
     this._clearGestureUnlock();

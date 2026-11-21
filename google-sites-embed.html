@@ -380,7 +380,7 @@
     .avatar-copy-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
     .avatar-modal-title { font-size: 19px; font-weight: 500; color: var(--text-primary); }
     .avatar-modal-meta { font-size: 12.5px; color: var(--text-secondary); margin-top: 3px; }
-    .avatar-script-box { flex: 1; background: #111318; border: 1px solid #282d36; border-radius: 10px; padding: 15px 17px; font-size: 15.5px; line-height: 1.65; color: #cfd6e0; overflow-y: auto; max-height: 195px; }
+    .avatar-script-box { position: relative; flex: 1; background: #111318; border: 1px solid #282d36; border-radius: 10px; padding: 15px 17px; font-size: 15.5px; line-height: 1.65; color: #cfd6e0; overflow-y: auto; max-height: 195px; }
     .av-word { transition: color 0.08s ease, background-color 0.08s ease; border-radius: 4px; padding: 0 1px; }
     .av-word.is-active { color: #ffffff; background: rgba(96,174,255,0.28); }
     .avatar-controls-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
@@ -2690,6 +2690,21 @@
         };
         this.rafId = requestAnimationFrame(step);
       },
+      scrollScriptToWord(wordEl) {
+        const box = els.avatarScriptText;
+        if (!box || !wordEl) return;
+        const viewH = box.clientHeight;
+        if (!viewH || box.scrollHeight <= viewH + 2) return;
+        const wordTop = wordEl.offsetTop;
+        const wordBottom = wordTop + wordEl.offsetHeight;
+        const viewTop = box.scrollTop;
+        const pad = Math.min(48, viewH * 0.25);
+        if (wordBottom > viewTop + viewH - pad || wordTop < viewTop + pad * 0.4) {
+          const targetScroll = Math.max(0, wordTop - viewH * 0.35);
+          if (typeof box.scrollTo === 'function') box.scrollTo({ top: targetScroll, behavior: 'smooth' });
+          else box.scrollTop = targetScroll;
+        }
+      },
       highlightWord(idx, queuePhonemes = true) {
         if (!els.avatarScriptText || idx === this.activeWordIdx) return;
         const prev = els.avatarScriptText.querySelector('.av-word.is-active');
@@ -2697,7 +2712,10 @@
         this.activeWordIdx = idx;
         if (idx >= 0) {
           const next = els.avatarScriptText.querySelector(`.av-word[data-widx="${idx}"]`);
-          if (next) next.classList.add('is-active');
+          if (next) {
+            next.classList.add('is-active');
+            this.scrollScriptToWord(next);
+          }
           if (queuePhonemes) {
             const spokenWord = (this.scriptData.spokenWords && this.scriptData.spokenWords[idx]) || this.scriptData.displayWords[idx] || '';
             this.wordPhQueue = { items: wordToPhonemes(spokenWord), idx: 0, elapsed: 0 };
@@ -2778,11 +2796,13 @@
           els.avatarScriptText.innerHTML = this.scriptData.displayWords.length
             ? this.scriptData.displayWords.map((w, i) => `<span class="av-word" data-widx="${i}">${w.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`).join(' ')
             : 'Forecast briefing unavailable.';
+          els.avatarScriptText.scrollTop = 0;
         }
         this.setMouth(0, 0, 0);
       },
       speak() {
         this.stop();
+        if (els.avatarScriptText) els.avatarScriptText.scrollTop = 0;
         this.manualStop = false;
         this.clearAutoClose();
         this.clearGestureUnlock();

@@ -1549,6 +1549,7 @@ body {
 }
 
 .avatar-script-box {
+  position: relative;
   flex: 1;
   background: #111318;
   border: 1px solid #282d36;

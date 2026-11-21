@@ -1,7 +1,12 @@
 package com.tempest.weather.tv
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.content.Intent
 import android.graphics.Color
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
@@ -23,14 +28,48 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var webView: WebView
     private var tts: TextToSpeech? = null
+    private var audioManager: AudioManager? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
     @Volatile
     private var ttsReady: Boolean = false
     @Volatile
     private var ttsFailed: Boolean = false
     @Volatile
     private var activeUtteranceId: String? = null
+    @Volatile
+    private var isResumed: Boolean = false
+    private var wentToBackground: Boolean = false
+    private var needsAudioWarmup: Boolean = true
     private var utteranceSeq: Long = 0
     private var pendingSpeech: Triple<String, Float, Float>? = null
+
+    private fun speechAudioAttributes(): AudioAttributes {
+        return AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
+    }
+
+    private fun requestSpeechAudioFocus() {
+        val am = audioManager ?: return
+        try {
+            if (audioFocusRequest == null) {
+                audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                    .setAudioAttributes(speechAudioAttributes())
+                    .setAcceptsDelayedFocusGain(true)
+                    .setOnAudioFocusChangeListener { }
+                    .build()
+            }
+            audioFocusRequest?.let { am.requestAudioFocus(it) }
+        } catch (_: Exception) {}
+    }
+
+    private fun abandonSpeechAudioFocus() {
+        val am = audioManager ?: return
+        try {
+            audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
+        } catch (_: Exception) {}
+    }
 
     private fun selectBestFemaleVoice() {
         try {
@@ -63,15 +102,27 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun speakNowOnUiThread(text: String, clampedRate: Float, clampedPitch: Float) {
         try {
+            requestSpeechAudioFocus()
+            tts?.setAudioAttributes(speechAudioAttributes())
             selectBestFemaleVoice()
             tts?.setSpeechRate(clampedRate)
             tts?.setPitch(clampedPitch)
             val uttId = "tempest_briefing_${++utteranceSeq}"
             activeUtteranceId = uttId
-            val params = Bundle()
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, uttId)
+            val params = Bundle().apply {
+                putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+            }
+            if (needsAudioWarmup) {
+                needsAudioWarmup = false
+                tts?.playSilentUtterance(280L, TextToSpeech.QUEUE_FLUSH, "tts_warmup")
+                tts?.speak(text, TextToSpeech.QUEUE_ADD, params, uttId)
+            } else {
+                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, uttId)
+            }
         } catch (_: Exception) {
             activeUtteranceId = null
+            abandonSpeechAudioFocus()
             webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
         }
     }
@@ -104,6 +155,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 try {
                     tts?.stop()
                 } catch (_: Exception) {}
+                abandonSpeechAudioFocus()
             }
         }
     }
@@ -112,7 +164,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Keep Sony Bravia screen awake while the weather dashboard is open
+        // Bind remote volume keys to media stream & keep Sony Bravia screen awake
+        volumeControlStream = AudioManager.STREAM_MUSIC
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         tts = TextToSpeech(this, this)
@@ -151,6 +205,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         webView.loadUrl("file:///android_asset/tv-dashboard.html")
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) {
             ttsReady = false
@@ -174,16 +233,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 return
             }
 
+            tts?.setAudioAttributes(speechAudioAttributes())
             selectBestFemaleVoice()
 
-            val pending = pendingSpeech
-            pendingSpeech = null
-            if (pending != null) {
-                runOnUiThread {
-                    speakNowOnUiThread(pending.first, pending.second, pending.third)
-                }
-            }
-
+            // Register listener BEFORE draining any queued initial utterance
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
                     if (utteranceId != activeUtteranceId) return
@@ -205,6 +258,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 override fun onDone(utteranceId: String?) {
                     if (utteranceId != activeUtteranceId) return
                     activeUtteranceId = null
+                    abandonSpeechAudioFocus()
                     runOnUiThread {
                         webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
                     }
@@ -214,6 +268,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 override fun onError(utteranceId: String?) {
                     if (utteranceId != activeUtteranceId) return
                     activeUtteranceId = null
+                    abandonSpeechAudioFocus()
                     runOnUiThread {
                         webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
                     }
@@ -222,11 +277,20 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 override fun onError(utteranceId: String?, errorCode: Int) {
                     if (utteranceId != activeUtteranceId) return
                     activeUtteranceId = null
+                    abandonSpeechAudioFocus()
                     runOnUiThread {
                         webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
                     }
                 }
             })
+
+            val pending = pendingSpeech
+            pendingSpeech = null
+            if (pending != null && isResumed) {
+                runOnUiThread {
+                    speakNowOnUiThread(pending.first, pending.second, pending.third)
+                }
+            }
         } catch (_: Exception) {
             ttsReady = false
         }
@@ -234,20 +298,39 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     override fun onResume() {
         super.onResume()
+        isResumed = true
         enterFullscreen()
         webView.onResume()
         webView.requestFocus()
+        if (wentToBackground) {
+            wentToBackground = false
+            webView.post {
+                webView.evaluateJavascript("window.__onAppForegroundResume && window.__onAppForegroundResume()", null)
+            }
+        }
     }
 
     override fun onPause() {
+        isResumed = false
+        pendingSpeech = null
+        activeUtteranceId = null
         try {
             tts?.stop()
         } catch (_: Exception) {}
+        abandonSpeechAudioFocus()
         if (::webView.isInitialized) {
-            webView.evaluateJavascript("window.__onNativeTtsEnd && window.__onNativeTtsEnd()", null)
+            webView.evaluateJavascript(
+                "window.__onAppBackground ? window.__onAppBackground() : (window.__onNativeTtsEnd && window.__onNativeTtsEnd())",
+                null
+            )
             webView.onPause()
         }
         super.onPause()
+    }
+
+    override fun onStop() {
+        wentToBackground = true
+        super.onStop()
     }
 
     override fun onDestroy() {
@@ -255,6 +338,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             tts?.stop()
             tts?.shutdown()
         } catch (_: Exception) {}
+        abandonSpeechAudioFocus()
         tts = null
         super.onDestroy()
     }
