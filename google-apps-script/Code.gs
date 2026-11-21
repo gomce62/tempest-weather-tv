@@ -306,14 +306,23 @@ function buildWeathermanBriefing_(bf, units, timezone) {
     lead = 'Tonight brings ' + sky + (lo !== null ? ' with temperatures dipping toward an overnight low near ' + lo + tu + '.' : '.');
   }
 
-  var pop = today && typeof today.precip_probability === 'number' ? Math.round(today.precip_probability) : 0;
-  var next12 = hourly.slice(0, 12);
+  var nowSec = Math.floor(Date.now() / 1000);
+  var upcomingHourly = [];
+  for (var ui = 0; ui < hourly.length; ui++) {
+    if (hourly[ui] && typeof hourly[ui].time === 'number' && hourly[ui].time >= nowSec - 1800) {
+      upcomingHourly.push(hourly[ui]);
+    }
+  }
+  var next12 = (upcomingHourly.length ? upcomingHourly : hourly).slice(0, 12);
   var peakPopH = null;
   for (var i = 0; i < next12.length; i++) {
     if (typeof next12[i].precip_probability === 'number') {
       if (!peakPopH || next12[i].precip_probability > peakPopH.precip_probability) peakPopH = next12[i];
     }
   }
+  var pop = (hr >= 12 || hr < 5) && peakPopH
+    ? Math.round(peakPopH.precip_probability)
+    : (today && typeof today.precip_probability === 'number' ? Math.round(today.precip_probability) : 0);
   var precipPhrase = 'Dry conditions hold steady';
   if (pop >= 60) {
     var peakWhen = peakPopH && peakPopH.time && peakPopH.precip_probability >= 50 ? ' around ' + formatHourBucket_(peakPopH.time, timezone) : '';

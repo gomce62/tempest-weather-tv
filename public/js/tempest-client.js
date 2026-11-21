@@ -258,14 +258,18 @@ export function buildWeathermanBriefing(betterForecast, units, timezone) {
     lead = `Tonight brings ${sky}${lo !== null ? ` with temperatures dipping toward an overnight low near ${lo}${tu}.` : '.'}`;
   }
 
-  const pop = typeof today?.precip_probability === 'number' ? Math.round(today.precip_probability) : 0;
-  const next12 = hourly.slice(0, 12);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const upcomingHourly = hourly.filter((h) => typeof h?.time === 'number' && h.time >= nowSec - 1800);
+  const next12 = (upcomingHourly.length ? upcomingHourly : hourly).slice(0, 12);
   let peakPopH = null;
   for (const h of next12) {
     if (typeof h.precip_probability === 'number') {
       if (!peakPopH || h.precip_probability > peakPopH.precip_probability) peakPopH = h;
     }
   }
+  const pop = (hr >= 12 || hr < 5) && peakPopH
+    ? Math.round(peakPopH.precip_probability)
+    : (typeof today?.precip_probability === 'number' ? Math.round(today.precip_probability) : 0);
   let precipPhrase = 'Dry conditions hold steady';
   if (pop >= 60) {
     const peakWhen = peakPopH?.time && peakPopH.precip_probability >= 50 ? ` around ${formatHourBucket(peakPopH.time, timezone)}` : '';

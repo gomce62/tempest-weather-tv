@@ -115,29 +115,41 @@ export function buildIndieForecastFromDashboard(data, fallbackText = '') {
   const todayKey = getLocalDateKey(nowSec, tz);
   const tomorrowKey = getLocalDateKey(nowSec + 86400, tz);
 
-  // Filter today's and tonight's hourly buckets
-  const todayHours = hourly.filter((h) => {
+  // Filter only upcoming hourly buckets (30-min cushion for current hour) so morning data never leaks into afternoon/evening
+  const upcomingHours = hourly.filter((h) => {
     const t = h.t ?? h.time;
-    return typeof t === 'number' && getLocalDateKey(t, tz) === todayKey;
+    return typeof t === 'number' && t >= nowSec - 1800;
   });
-  const overnightHours = hourly.filter((h) => {
+  const todayHours = upcomingHours.filter((h) => {
     const t = h.t ?? h.time;
-    if (typeof t !== 'number') return false;
+    return getLocalDateKey(t, tz) === todayKey;
+  });
+  const overnightHours = upcomingHours.filter((h) => {
+    const t = h.t ?? h.time;
+    if (t > nowSec + 14 * 3600) return false;
     const key = getLocalDateKey(t, tz);
     const hr = getStationHourForEpoch(t, tz);
+    if (nowHr < 5) {
+      return key === todayKey && hr < 6;
+    }
     return (key === todayKey && hr >= 22) || (key === tomorrowKey && hr < 6);
   });
 
   const midAfternoonSlice = todayHours.filter((h) => {
     const hr = getStationHourForEpoch(h.t ?? h.time, tz);
-    return hr >= 13 && hr <= 16;
+    return hr >= Math.max(13, nowHr) && hr <= 16;
+  });
+  const restAfternoonSlice = todayHours.filter((h) => {
+    const hr = getStationHourForEpoch(h.t ?? h.time, tz);
+    return hr >= nowHr && hr <= 17;
   });
   const eveningSlice = todayHours.filter((h) => {
     const hr = getStationHourForEpoch(h.t ?? h.time, tz);
-    return hr >= 17 && hr <= 21;
+    return hr >= Math.max(17, nowHr) && hr <= 21;
   });
 
   const midAft = summarizeHourlyWindow(midAfternoonSlice);
+  const restAft = summarizeHourlyWindow(restAfternoonSlice);
   const evening = summarizeHourlyWindow(eveningSlice);
   const overnight = summarizeHourlyWindow(overnightHours);
 
@@ -158,11 +170,11 @@ export function buildIndieForecastFromDashboard(data, fallbackText = '') {
     leadParts.push(`It is currently ${curTemp}${tu} and ${String(curCond).toLowerCase()}${windBit}.`);
   }
 
-  // 2. Mid-Afternoon
+  // 2. Afternoon outlook (adapts cleanly as morning transitions to early/late afternoon)
   const todayHi = typeof today?.high === 'number' ? Math.round(today.high) : typeof cur.todayHigh === 'number' ? Math.round(cur.todayHigh) : null;
   const todayPop = typeof today?.precipProbability === 'number' ? Math.round(today.precipProbability) : 0;
 
-  if (nowHr < 16) {
+  if (nowHr >= 5 && nowHr < 12) {
     const aftTemp = midAft?.maxTemp ?? todayHi;
     const aftSky = skyDesc(midAft?.cond || today?.conditions || curCond, false);
     const aftPop = Math.max(midAft?.maxPop ?? 0, todayPop);
@@ -176,26 +188,59 @@ export function buildIndieForecastFromDashboard(data, fallbackText = '') {
     leadParts.push(
       `You can expect ${aftSky} for mid-afternoon${aftTemp !== null ? ` with temperatures climbing near ${aftTemp}${tu}` : ''}${windTxt}${popTxt}.${uvTxt}`
     );
+  } else if (nowHr >= 12 && nowHr < 14) {
+    const aftTemp = midAft?.maxTemp ?? restAft?.maxTemp ?? curTemp;
+    const aftSky = skyDesc(midAft?.cond || restAft?.cond || curCond, false);
+    const aftPop = midAft?.maxPop ?? restAft?.maxPop ?? 0;
+    const aftWind = midAft?.maxWind ?? restAft?.maxWind;
+    const popTxt = aftPop >= 25 ? ` and a ${aftPop}% chance of rain` : '';
+    const windTxt =
+      typeof aftWind === 'number' && aftWind >= 4
+        ? ` with a breeze near ${aftWind} ${wu}`
+        : '';
+    const uvTxt = typeof cur.uv === 'number' && cur.uv >= 6 ? ' Keep sunglasses and SPF handy for high UV.' : '';
+    leadParts.push(
+      `For mid-afternoon, expect ${aftSky}${aftTemp !== null ? ` with highs near ${aftTemp}${tu}` : ''}${windTxt}${popTxt}.${uvTxt}`
+    );
+  } else if (nowHr >= 14 && nowHr < 17) {
+    const restTemp = restAft?.maxTemp ?? curTemp;
+    const restSky = skyDesc(restAft?.cond || curCond, false);
+    const restPop = restAft?.maxPop ?? 0;
+    const restWind = restAft?.maxWind;
+    const popTxt = restPop >= 25 ? ` and a ${restPop}% chance of showers` : '';
+    const windTxt =
+      typeof restWind === 'number' && restWind >= 4
+        ? ` with winds near ${restWind} ${wu}`
+        : '';
+    leadParts.push(
+      `Through the rest of the afternoon, expect ${restSky}${restTemp !== null ? ` holding near ${restTemp}${tu}` : ''}${windTxt}${popTxt}.`
+    );
   }
 
-  // 3. Evening
-  if (nowHr < 21) {
-    const eveTemp = evening?.avgTemp;
-    const eveSky = skyDesc(evening?.cond || today?.conditions || curCond, true);
+  // 3. Evening (spoken before 9 PM)
+  const hasEveningClause = nowHr >= 5 && nowHr < 21;
+  if (hasEveningClause) {
+    const eveTemp = evening?.avgTemp ?? (nowHr >= 17 ? curTemp : null);
+    const eveSky = skyDesc(evening?.cond || (nowHr < 12 ? today?.conditions : null) || curCond, true);
     const evePop = evening?.maxPop ?? 0;
     const eveRain = evePop >= 25 ? ` with a ${evePop}% chance of passing showers` : '';
-    leadParts.push(
-      `Moving into the evening, expect ${eveSky}${eveTemp !== null ? ` as temperatures cool toward ${eveTemp}${tu}` : ''}${eveRain},`
-    );
+    const eveIntro = nowHr >= 17 ? 'Through the rest of the evening, expect' : 'Moving into the evening, expect';
+    const tempClause =
+      eveTemp !== null
+        ? nowHr >= 17
+          ? ` with temperatures settling near ${eveTemp}${tu}`
+          : ` as temperatures cool toward ${eveTemp}${tu}`
+        : '';
+    leadParts.push(`${eveIntro} ${eveSky}${tempClause}${eveRain},`);
   }
 
   // 4. Overnight
   const todayLo = typeof today?.low === 'number' ? Math.round(today.low) : typeof cur.todayLow === 'number' ? Math.round(cur.todayLow) : null;
   const nightLo = overnight?.minTemp ?? todayLo;
-  const nightSky = skyDesc(overnight?.cond || today?.conditions || curCond, true);
+  const nightSky = skyDesc(overnight?.cond || (nowHr < 12 ? today?.conditions : null) || curCond, true);
   const nightPop = overnight?.maxPop ?? 0;
   const nightRain = nightPop >= 30 ? ` and a ${nightPop}% chance of showers` : '';
-  if (nowHr < 21) {
+  if (hasEveningClause) {
     leadParts.push(
       `with overnight calling for ${nightSky}${nightLo !== null ? ` and a low dipping near ${nightLo}${tu}` : ''}${nightRain}.`
     );
@@ -205,8 +250,12 @@ export function buildIndieForecastFromDashboard(data, fallbackText = '') {
     );
   }
 
-  // 5. Tomorrow quick look
-  if (tomorrow && typeof tomorrow.high === 'number') {
+  // 5. Next-day quick look (if before 5 AM, preview later today; otherwise preview tomorrow)
+  if (nowHr < 5 && today && typeof today.high === 'number') {
+    const daySky = skyDesc(today.conditions, false);
+    const dayRain = todayPop >= 35 ? ` (${todayPop}% chance of rain)` : '';
+    leadParts.push(`Later today brings ${daySky}${dayRain} with a high near ${Math.round(today.high)}${tu}.`);
+  } else if (tomorrow && typeof tomorrow.high === 'number') {
     const tomSky = skyDesc(tomorrow.conditions, false);
     const tomPop = typeof tomorrow.precipProbability === 'number' ? Math.round(tomorrow.precipProbability) : 0;
     const tomRain = tomPop >= 35 ? ` (${tomPop}% chance of rain)` : '';
@@ -600,6 +649,9 @@ export class WeatherAvatarController {
     this.usingNativeTts = false;
     this.currentUtterance = null;
     this.autoPlayedOnce = false;
+    this.hasPlayedOnce = false;
+    this._startupWatchdog = null;
+    this._gestureUnlockCleanup = null;
 
     indieMouthEngine.warmup();
     this._warmVoices();
@@ -666,6 +718,8 @@ export class WeatherAvatarController {
   _installGlobalNativeHooks() {
     window.__onNativeTtsStart = () => {
       if (!this.usingNativeTts) return;
+      this.hasPlayedOnce = true;
+      this._clearStartupWatchdog();
       this._setSpeakingState(true);
     };
     window.__onNativeTtsRange = (start) => {
@@ -880,16 +934,63 @@ export class WeatherAvatarController {
     }
   }
 
-  _setSpeakingState(isSpeaking) {
+  _clearStartupWatchdog() {
+    if (this._startupWatchdog) {
+      clearTimeout(this._startupWatchdog);
+      this._startupWatchdog = null;
+    }
+  }
+
+  _clearGestureUnlock() {
+    if (typeof this._gestureUnlockCleanup === 'function') {
+      this._gestureUnlockCleanup();
+      this._gestureUnlockCleanup = null;
+    }
+  }
+
+  _armGestureUnlock() {
+    if (this._gestureUnlockCleanup) return;
+    const onFirstGesture = (e) => {
+      const target = e.target;
+      if (target && typeof target.closest === 'function') {
+        if (target.closest('#avatar-close, #avatar-autoplay-toggle, #avatar-autoplay-btn')) {
+          this._clearGestureUnlock();
+          return;
+        }
+        if (target.closest('#avatar-toggle-speak')) {
+          // Let the Play Briefing button's own click handler call speak() once
+          this._clearGestureUnlock();
+          return;
+        }
+      }
+      this._clearGestureUnlock();
+      if (!this.speaking && this.stageEl?.offsetParent !== null) {
+        this.speak();
+      }
+    };
+    document.addEventListener('pointerdown', onFirstGesture, true);
+    document.addEventListener('keydown', onFirstGesture, true);
+    this._gestureUnlockCleanup = () => {
+      document.removeEventListener('pointerdown', onFirstGesture, true);
+      document.removeEventListener('keydown', onFirstGesture, true);
+    };
+  }
+
+  _setSpeakingState(isSpeaking, statusOverride = null) {
     this.speaking = isSpeaking;
     const svg = this.stageEl?.querySelector('.avatar-svg');
     if (svg) svg.classList.toggle('is-speaking', isSpeaking);
     if (this.statusPillEl) this.statusPillEl.classList.toggle('is-live', isSpeaking);
     if (this.statusTextEl) {
-      this.statusTextEl.textContent = isSpeaking ? 'ON AIR · INDIE LIVE' : 'READY · INDIE ON ALTA CT';
+      this.statusTextEl.textContent =
+        statusOverride || (isSpeaking ? 'ON AIR · INDIE LIVE' : 'READY · INDIE ON ALTA CT');
     }
     if (this.btnToggleSpeak) {
-      this.btnToggleSpeak.textContent = isSpeaking ? 'Stop Indie' : 'Replay Briefing';
+      this.btnToggleSpeak.textContent = isSpeaking
+        ? 'Stop Indie'
+        : this.hasPlayedOnce
+          ? 'Replay Briefing'
+          : 'Play Briefing';
     }
 
     if (isSpeaking) {
@@ -946,10 +1047,11 @@ export class WeatherAvatarController {
     return enVoices.find((v) => v.default) || enVoices[0] || null;
   }
 
-  async speak() {
+  speak() {
     this.stop();
     this.manualStop = false;
     this._clearAutoClose();
+    this._clearGestureUnlock();
     const spoken = this.scriptData.spokenText;
     if (!spoken) return;
 
@@ -958,6 +1060,7 @@ export class WeatherAvatarController {
       try {
         if (window.AndroidTTS.isAvailable()) {
           this.usingNativeTts = true;
+          this.hasPlayedOnce = true;
           this._setSpeakingState(true);
           const ok = window.AndroidTTS.speak(spoken, 0.90, 0.94);
           if (ok) return;
@@ -966,7 +1069,7 @@ export class WeatherAvatarController {
       } catch {}
     }
 
-    // 2. Browser Web Speech API — wait for voices to finish loading so first play is ALWAYS female
+    // 2. Browser Web Speech API — speak synchronously when voices are already loaded so user gestures stay intact
     if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
       if (this.statusTextEl) {
         this.statusTextEl.textContent = 'SPEECH UNAVAILABLE ON THIS DEVICE';
@@ -975,10 +1078,21 @@ export class WeatherAvatarController {
       return;
     }
 
-    const voice = await this._waitForFemaleVoice(700);
-    if (this.manualStop) return;
+    const voicesNow = window.speechSynthesis.getVoices() || [];
+    if (voicesNow.length > 0) {
+      this._speakWithVoice(spoken, this._pickBestBrowserVoice());
+      return;
+    }
 
+    this._waitForFemaleVoice(700).then((voice) => {
+      if (this.manualStop) return;
+      this._speakWithVoice(spoken, voice);
+    });
+  }
+
+  _speakWithVoice(spoken, voice) {
     try {
+      this._clearStartupWatchdog();
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(spoken);
       utt.rate = 0.90;
@@ -990,28 +1104,67 @@ export class WeatherAvatarController {
         utt.lang = 'en-US';
       }
 
-      utt.onstart = () => this._setSpeakingState(true);
+      let started = false;
+      const handleBlockedAutoplay = () => {
+        if (started || this.manualStop) return;
+        this._clearStartupWatchdog();
+        try {
+          window.speechSynthesis.cancel();
+        } catch {}
+        this.currentUtterance = null;
+        this._setSpeakingState(false, 'READY · TAP ANYWHERE TO PLAY');
+        this._armGestureUnlock();
+      };
+
+      utt.onstart = () => {
+        started = true;
+        this.hasPlayedOnce = true;
+        this._clearStartupWatchdog();
+        this._clearGestureUnlock();
+        this._setSpeakingState(true);
+      };
       utt.onboundary = (e) => {
         if (typeof e.charIndex === 'number') this._handleCharBoundary(e.charIndex);
       };
       utt.onend = () => {
+        this._clearStartupWatchdog();
         this.currentUtterance = null;
         const shouldAutoClose = !this.manualStop;
         this._setSpeakingState(false);
         if (shouldAutoClose) this._scheduleAutoClose();
       };
       utt.onerror = (e) => {
+        this._clearStartupWatchdog();
         this.currentUtterance = null;
-        this._setSpeakingState(false);
-        if (e && e.error === 'not-allowed' && this.statusTextEl) {
-          this.statusTextEl.textContent = 'TAP REPLAY TO HEAR INDIE';
+        if (e && e.error === 'not-allowed') {
+          handleBlockedAutoplay();
+          return;
         }
+        this._setSpeakingState(false);
       };
 
       this.currentUtterance = utt;
       this._setSpeakingState(true);
       window.speechSynthesis.speak(utt);
+
+      // Watchdog catches Safari & Chrome when autoplay policy silently ignores un-gestured speak()
+      this._startupWatchdog = setTimeout(() => {
+        this._startupWatchdog = null;
+        if (started || this.manualStop || this.currentUtterance !== utt) return;
+        const synthBusy = Boolean(window.speechSynthesis?.speaking || window.speechSynthesis?.pending);
+        if (!synthBusy) {
+          handleBlockedAutoplay();
+        } else {
+          this._startupWatchdog = setTimeout(() => {
+            this._startupWatchdog = null;
+            if (!started && !this.manualStop && this.currentUtterance === utt) {
+              handleBlockedAutoplay();
+            }
+          }, 1200);
+        }
+      }, 550);
     } catch {
+      this._clearStartupWatchdog();
       this._setSpeakingState(false);
     }
   }
@@ -1019,6 +1172,8 @@ export class WeatherAvatarController {
   stop() {
     this.manualStop = true;
     this._clearAutoClose();
+    this._clearStartupWatchdog();
+    this._clearGestureUnlock();
     if (this.usingNativeTts && window.AndroidTTS && typeof window.AndroidTTS.stop === 'function') {
       try {
         window.AndroidTTS.stop();

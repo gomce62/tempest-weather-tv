@@ -886,7 +886,7 @@
             </div>
             <div id="avatar-script-text" class="avatar-script-box" aria-live="polite">Loading today's forecast briefing...</div>
             <div class="avatar-controls-row">
-              <button id="avatar-toggle-speak" class="avatar-action-btn is-primary" type="button">Replay Briefing</button>
+              <button id="avatar-toggle-speak" class="avatar-action-btn is-primary" type="button">Play Briefing</button>
               <button id="avatar-autoplay-btn" class="avatar-action-btn is-secondary" type="button">Auto-Play: On</button>
             </div>
             <div class="detail-footer-hint" style="padding-top:0;text-align:left;">Remote: &larr;/&rarr; Choose Button &middot; OK Select &middot; Back to Close</div>
@@ -1186,12 +1186,16 @@
       else if (hr >= 17 && hr < 21) lead = `Good evening! Expect ${sky} tonight${lo !== null ? ` as temperatures settle toward an overnight low near ${lo}${tu}.` : '.'}`;
       else lead = `Tonight brings ${sky}${lo !== null ? ` with temperatures dipping toward an overnight low near ${lo}${tu}.` : '.'}`;
 
-      const pop = today && typeof today.precipProbability === 'number' ? Math.round(today.precipProbability) : 0;
+      const nowSec = Math.floor(Date.now() / 1000);
+      const upcomingH = hourly.filter((h) => typeof (h.t || h.time) === 'number' && (h.t || h.time) >= nowSec - 1800);
       let peakPopH = null;
-      for (const h of hourly.slice(0, 12)) {
+      for (const h of (upcomingH.length ? upcomingH : hourly).slice(0, 12)) {
         const hp = typeof h.p === 'number' ? h.p : h.precip_probability;
         if (typeof hp === 'number' && (!peakPopH || hp > peakPopH.p)) peakPopH = { p: hp, t: h.t || h.time };
       }
+      const pop = (hr >= 12 || hr < 5) && peakPopH
+        ? Math.round(peakPopH.p)
+        : (today && typeof today.precipProbability === 'number' ? Math.round(today.precipProbability) : 0);
       let precipPhrase = 'Dry conditions hold steady';
       if (pop >= 60) {
         const pw = peakPopH && peakPopH.t && peakPopH.p >= 50 ? ` around ${fmtHourBucket(peakPopH.t, tz)}` : '';
@@ -1506,14 +1510,18 @@
         try { const h = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: tz || undefined }).format(new Date(ep * 1000))); return Number.isNaN(h) ? new Date(ep * 1000).getHours() : h % 24; }
         catch { return new Date(ep * 1000).getHours(); }
       };
-      const todayHours = hourly.filter((h) => typeof (h.t ?? h.time) === 'number' && getLocalDateKey(h.t ?? h.time, tz) === todayKey);
-      const overnightHours = hourly.filter((h) => {
-        const t = h.t ?? h.time; if (typeof t !== 'number') return false;
+      const upcomingHours = hourly.filter((h) => typeof (h.t ?? h.time) === 'number' && (h.t ?? h.time) >= nowSec - 1800);
+      const todayHours = upcomingHours.filter((h) => getLocalDateKey(h.t ?? h.time, tz) === todayKey);
+      const overnightHours = upcomingHours.filter((h) => {
+        const t = h.t ?? h.time;
+        if (t > nowSec + 14 * 3600) return false;
         const k = getLocalDateKey(t, tz), hr = hrOf(t);
+        if (nowHr < 5) return k === todayKey && hr < 6;
         return (k === todayKey && hr >= 22) || (k === tomorrowKey && hr < 6);
       });
-      const midAft = summarizeWindow(todayHours.filter((h) => { const hr = hrOf(h.t ?? h.time); return hr >= 13 && hr <= 16; }));
-      const evening = summarizeWindow(todayHours.filter((h) => { const hr = hrOf(h.t ?? h.time); return hr >= 17 && hr <= 21; }));
+      const midAft = summarizeWindow(todayHours.filter((h) => { const hr = hrOf(h.t ?? h.time); return hr >= Math.max(13, nowHr) && hr <= 16; }));
+      const restAft = summarizeWindow(todayHours.filter((h) => { const hr = hrOf(h.t ?? h.time); return hr >= nowHr && hr <= 17; }));
+      const evening = summarizeWindow(todayHours.filter((h) => { const hr = hrOf(h.t ?? h.time); return hr >= Math.max(17, nowHr) && hr <= 21; }));
       const overnight = summarizeWindow(overnightHours);
 
       const curTemp = typeof cur.temperature === 'number' ? Math.round(cur.temperature) : null;
@@ -1529,7 +1537,7 @@
       }
       const todayHi = today && typeof today.high === 'number' ? Math.round(today.high) : typeof cur.todayHigh === 'number' ? Math.round(cur.todayHigh) : null;
       const todayPop = today && typeof today.precipProbability === 'number' ? Math.round(today.precipProbability) : 0;
-      if (nowHr < 16) {
+      if (nowHr >= 5 && nowHr < 12) {
         const aftTemp = (midAft && midAft.maxTemp !== null) ? midAft.maxTemp : todayHi;
         const aftSky = skyDesc((midAft && midAft.cond) || (today && today.conditions) || curCond, false);
         const aftPop = Math.max((midAft && midAft.maxPop) || 0, todayPop);
@@ -1537,22 +1545,44 @@
         const windTxt = midAft && typeof midAft.maxWind === 'number' && midAft.maxWind >= 4 ? ` with a breeze near ${midAft.maxWind} ${wu}` : '';
         const uvTxt = typeof cur.uv === 'number' && cur.uv >= 6 ? ' Keep sunglasses and SPF handy for high UV.' : '';
         parts.push(`You can expect ${aftSky} for mid-afternoon${aftTemp !== null ? ` with temperatures climbing near ${aftTemp}${tu}` : ''}${windTxt}${popTxt}.${uvTxt}`);
+      } else if (nowHr >= 12 && nowHr < 14) {
+        const aftTemp = (midAft && midAft.maxTemp !== null) ? midAft.maxTemp : (restAft && restAft.maxTemp !== null) ? restAft.maxTemp : curTemp;
+        const aftSky = skyDesc((midAft && midAft.cond) || (restAft && restAft.cond) || curCond, false);
+        const aftPop = (midAft && midAft.maxPop) ?? (restAft && restAft.maxPop) ?? 0;
+        const aftWind = (midAft && typeof midAft.maxWind === 'number') ? midAft.maxWind : (restAft && restAft.maxWind);
+        const popTxt = aftPop >= 25 ? ` and a ${aftPop}% chance of rain` : '';
+        const windTxt = typeof aftWind === 'number' && aftWind >= 4 ? ` with a breeze near ${aftWind} ${wu}` : '';
+        const uvTxt = typeof cur.uv === 'number' && cur.uv >= 6 ? ' Keep sunglasses and SPF handy for high UV.' : '';
+        parts.push(`For mid-afternoon, expect ${aftSky}${aftTemp !== null ? ` with highs near ${aftTemp}${tu}` : ''}${windTxt}${popTxt}.${uvTxt}`);
+      } else if (nowHr >= 14 && nowHr < 17) {
+        const restTemp = (restAft && restAft.maxTemp !== null) ? restAft.maxTemp : curTemp;
+        const restSky = skyDesc((restAft && restAft.cond) || curCond, false);
+        const restPop = (restAft && restAft.maxPop) || 0;
+        const popTxt = restPop >= 25 ? ` and a ${restPop}% chance of showers` : '';
+        const windTxt = restAft && typeof restAft.maxWind === 'number' && restAft.maxWind >= 4 ? ` with winds near ${restAft.maxWind} ${wu}` : '';
+        parts.push(`Through the rest of the afternoon, expect ${restSky}${restTemp !== null ? ` holding near ${restTemp}${tu}` : ''}${windTxt}${popTxt}.`);
       }
-      if (nowHr < 21) {
-        const eveTemp = evening && evening.avgTemp;
-        const eveSky = skyDesc((evening && evening.cond) || (today && today.conditions) || curCond, true);
+      const hasEveningClause = nowHr >= 5 && nowHr < 21;
+      if (hasEveningClause) {
+        const eveTemp = (evening && evening.avgTemp !== null) ? evening.avgTemp : (nowHr >= 17 ? curTemp : null);
+        const eveSky = skyDesc((evening && evening.cond) || (nowHr < 12 && today && today.conditions) || curCond, true);
         const evePop = (evening && evening.maxPop) || 0;
         const eveRain = evePop >= 25 ? ` with a ${evePop}% chance of passing showers` : '';
-        parts.push(`Moving into the evening, expect ${eveSky}${eveTemp !== null ? ` as temperatures cool toward ${eveTemp}${tu}` : ''}${eveRain},`);
+        const eveIntro = nowHr >= 17 ? 'Through the rest of the evening, expect' : 'Moving into the evening, expect';
+        const tempClause = eveTemp !== null ? (nowHr >= 17 ? ` with temperatures settling near ${eveTemp}${tu}` : ` as temperatures cool toward ${eveTemp}${tu}`) : '';
+        parts.push(`${eveIntro} ${eveSky}${tempClause}${eveRain},`);
       }
       const todayLo = today && typeof today.low === 'number' ? Math.round(today.low) : typeof cur.todayLow === 'number' ? Math.round(cur.todayLow) : null;
       const nightLo = (overnight && overnight.minTemp !== null) ? overnight.minTemp : todayLo;
-      const nightSky = skyDesc((overnight && overnight.cond) || (today && today.conditions) || curCond, true);
+      const nightSky = skyDesc((overnight && overnight.cond) || (nowHr < 12 && today && today.conditions) || curCond, true);
       const nightPop = (overnight && overnight.maxPop) || 0;
       const nightRain = nightPop >= 30 ? ` and a ${nightPop}% chance of showers` : '';
-      if (nowHr < 21) parts.push(`with overnight calling for ${nightSky}${nightLo !== null ? ` and a low dipping near ${nightLo}${tu}` : ''}${nightRain}.`);
+      if (hasEveningClause) parts.push(`with overnight calling for ${nightSky}${nightLo !== null ? ` and a low dipping near ${nightLo}${tu}` : ''}${nightRain}.`);
       else parts.push(`Overnight calls for ${nightSky}${nightLo !== null ? ` with temperatures settling near ${nightLo}${tu}` : ''}${nightRain}.`);
-      if (tomorrow && typeof tomorrow.high === 'number') {
+      if (nowHr < 5 && today && typeof today.high === 'number') {
+        const daySky = skyDesc(today.conditions, false);
+        parts.push(`Later today brings ${daySky}${todayPop >= 35 ? ` (${todayPop}% chance of rain)` : ''} with a high near ${Math.round(today.high)}${tu}.`);
+      } else if (tomorrow && typeof tomorrow.high === 'number') {
         const tomSky = skyDesc(tomorrow.conditions, false);
         const tomPop = typeof tomorrow.precipProbability === 'number' ? Math.round(tomorrow.precipProbability) : 0;
         parts.push(`Looking ahead, tomorrow brings ${tomSky}${tomPop >= 35 ? ` (${tomPop}% chance of rain)` : ''} with a high near ${Math.round(tomorrow.high)}${tu}.`);
@@ -1815,7 +1845,11 @@
       estTimeline: [],
       speechStartMs: 0,
       usingNativeTts: false,
+      currentUtterance: null,
       autoPlayedOnce: false,
+      hasPlayedOnce: false,
+      startupWatchdog: null,
+      gestureUnlockCleanup: null,
       isAutoPlayEnabled() {
         try {
           const val = localStorage.getItem('tv_avatar_autoplay');
@@ -1978,13 +2012,46 @@
           if (charIndex <= bounds[i].end) { this.highlightWord(bounds[i].wordIdx, true); return; }
         }
       },
-      setSpeakingState(isSpeaking) {
+      clearStartupWatchdog() {
+        if (this.startupWatchdog) { clearTimeout(this.startupWatchdog); this.startupWatchdog = null; }
+      },
+      clearGestureUnlock() {
+        if (typeof this.gestureUnlockCleanup === 'function') {
+          this.gestureUnlockCleanup();
+          this.gestureUnlockCleanup = null;
+        }
+      },
+      armGestureUnlock() {
+        if (this.gestureUnlockCleanup) return;
+        const onFirstGesture = (e) => {
+          const target = e.target;
+          if (target && typeof target.closest === 'function') {
+            if (target.closest('#avatar-close, #avatar-autoplay-btn')) { this.clearGestureUnlock(); return; }
+            if (target.closest('#avatar-toggle-speak')) { this.clearGestureUnlock(); return; }
+          }
+          this.clearGestureUnlock();
+          if (!this.speaking && els.avatarModal && !els.avatarModal.classList.contains('hidden')) {
+            this.speak();
+          }
+        };
+        document.addEventListener('pointerdown', onFirstGesture, true);
+        document.addEventListener('keydown', onFirstGesture, true);
+        this.gestureUnlockCleanup = () => {
+          document.removeEventListener('pointerdown', onFirstGesture, true);
+          document.removeEventListener('keydown', onFirstGesture, true);
+        };
+      },
+      setSpeakingState(isSpeaking, statusOverride = null) {
         this.speaking = isSpeaking;
         const svg = els.avatarStage && els.avatarStage.querySelector('.avatar-svg');
         if (svg) svg.classList.toggle('is-speaking', isSpeaking);
         if (els.avatarStatusPill) els.avatarStatusPill.classList.toggle('is-live', isSpeaking);
-        if (els.avatarStatusText) els.avatarStatusText.textContent = isSpeaking ? 'ON AIR · INDIE LIVE' : 'READY · INDIE ON ALTA CT';
-        if (els.avatarToggleSpeak) els.avatarToggleSpeak.textContent = isSpeaking ? 'Stop Indie' : 'Replay Briefing';
+        if (els.avatarStatusText) {
+          els.avatarStatusText.textContent = statusOverride || (isSpeaking ? 'ON AIR · INDIE LIVE' : 'READY · INDIE ON ALTA CT');
+        }
+        if (els.avatarToggleSpeak) {
+          els.avatarToggleSpeak.textContent = isSpeaking ? 'Stop Indie' : (this.hasPlayedOnce ? 'Replay Briefing' : 'Play Briefing');
+        }
         if (isSpeaking) {
           this.smileAtEnd = true;
           this.hadBoundary = false;
@@ -2014,16 +2081,18 @@
         }
         this.setMouth(0, 0, 0);
       },
-      async speak() {
+      speak() {
         this.stop();
         this.manualStop = false;
         this.clearAutoClose();
+        this.clearGestureUnlock();
         const spoken = this.scriptData.spokenText;
         if (!spoken) return;
         if (window.AndroidTTS && typeof window.AndroidTTS.isAvailable === 'function') {
           try {
             if (window.AndroidTTS.isAvailable()) {
               this.usingNativeTts = true;
+              this.hasPlayedOnce = true;
               this.setSpeakingState(true);
               if (window.AndroidTTS.speak(spoken, 0.90, 0.94)) return;
               this.usingNativeTts = false;
@@ -2035,38 +2104,85 @@
           this.setSpeakingState(false);
           return;
         }
-        const v = await this.waitForFemaleVoice(700);
-        if (this.manualStop) return;
+        const voicesNow = window.speechSynthesis.getVoices() || [];
+        if (voicesNow.length > 0) {
+          this.speakWithVoice(spoken, this.pickBrowserVoice());
+          return;
+        }
+        this.waitForFemaleVoice(700).then((v) => {
+          if (this.manualStop) return;
+          this.speakWithVoice(spoken, v);
+        });
+      },
+      speakWithVoice(spoken, v) {
         try {
+          this.clearStartupWatchdog();
           window.speechSynthesis.cancel();
           const utt = new SpeechSynthesisUtterance(spoken);
           utt.rate = 0.90; utt.pitch = 0.94;
           if (v) { utt.voice = v; utt.lang = v.lang || 'en-US'; } else { utt.lang = 'en-US'; }
-          utt.onstart = () => this.setSpeakingState(true);
+          let started = false;
+          const handleBlockedAutoplay = () => {
+            if (started || this.manualStop) return;
+            this.clearStartupWatchdog();
+            try { window.speechSynthesis.cancel(); } catch {}
+            this.currentUtterance = null;
+            this.setSpeakingState(false, 'READY · TAP ANYWHERE TO PLAY');
+            this.armGestureUnlock();
+          };
+          utt.onstart = () => {
+            started = true;
+            this.hasPlayedOnce = true;
+            this.clearStartupWatchdog();
+            this.clearGestureUnlock();
+            this.setSpeakingState(true);
+          };
           utt.onboundary = (e) => { if (typeof e.charIndex === 'number') this.handleBoundary(e.charIndex); };
           utt.onend = () => {
+            this.clearStartupWatchdog();
+            this.currentUtterance = null;
             const shouldClose = !this.manualStop;
             this.setSpeakingState(false);
             if (shouldClose) this.scheduleAutoClose();
           };
           utt.onerror = (e) => {
+            this.clearStartupWatchdog();
+            this.currentUtterance = null;
+            if (e && e.error === 'not-allowed') { handleBlockedAutoplay(); return; }
             this.setSpeakingState(false);
-            if (e && e.error === 'not-allowed' && els.avatarStatusText) els.avatarStatusText.textContent = 'TAP REPLAY TO HEAR INDIE';
           };
+          this.currentUtterance = utt;
           this.setSpeakingState(true);
           window.speechSynthesis.speak(utt);
+          this.startupWatchdog = setTimeout(() => {
+            this.startupWatchdog = null;
+            if (started || this.manualStop || this.currentUtterance !== utt) return;
+            const synthBusy = Boolean(window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending));
+            if (!synthBusy) {
+              handleBlockedAutoplay();
+            } else {
+              this.startupWatchdog = setTimeout(() => {
+                this.startupWatchdog = null;
+                if (!started && !this.manualStop && this.currentUtterance === utt) handleBlockedAutoplay();
+              }, 1200);
+            }
+          }, 550);
         } catch {
+          this.clearStartupWatchdog();
           this.setSpeakingState(false);
         }
       },
       stop() {
         this.manualStop = true;
         this.clearAutoClose();
+        this.clearStartupWatchdog();
+        this.clearGestureUnlock();
         if (this.usingNativeTts && window.AndroidTTS && typeof window.AndroidTTS.stop === 'function') {
           try { window.AndroidTTS.stop(); } catch {}
         }
         this.usingNativeTts = false;
         if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch {} }
+        this.currentUtterance = null;
         this.setSpeakingState(false);
       },
     };
@@ -2080,7 +2196,12 @@
       } catch {}
     }
 
-    window.__onNativeTtsStart = () => { if (avatarCtrl.usingNativeTts) avatarCtrl.setSpeakingState(true); };
+    window.__onNativeTtsStart = () => {
+      if (!avatarCtrl.usingNativeTts) return;
+      avatarCtrl.hasPlayedOnce = true;
+      avatarCtrl.clearStartupWatchdog();
+      avatarCtrl.setSpeakingState(true);
+    };
     window.__onNativeTtsRange = (start) => { if (avatarCtrl.usingNativeTts) avatarCtrl.handleBoundary(start); };
     window.__onNativeTtsEnd = () => {
       if (avatarCtrl.usingNativeTts) {
