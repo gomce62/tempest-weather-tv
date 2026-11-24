@@ -2198,13 +2198,21 @@
       };
     }
 
+    function getTimeOfDayIntro(hr) {
+      const prefix = "Hi, I'm Indie, your Morro Bay Alta Court weather girl. ";
+      if (hr >= 5 && hr < 12) return `${prefix}Today's forecast calls for `;
+      if (hr >= 12 && hr < 17) return `${prefix}This afternoon's forecast calls for `;
+      if (hr >= 17 && hr < 21) return `${prefix}This evening's forecast calls for `;
+      return `${prefix}Tonight's forecast calls for `;
+    }
+
     function buildIndieForecastFromDashboard(data, fallbackText) {
-      const intro = "Hi, I'm Indie, your Morro Bay Alta Court weather girl. Today's forecast calls for ";
-      if (!data || !data.current) return formatIndieForecastScript(fallbackText);
+      if (!data || !data.current) return formatIndieForecastScript(fallbackText, data && data.station && data.station.timezone);
       const cur = data.current || {}, daily = Array.isArray(data.daily) ? data.daily : [], hourly = Array.isArray(data.hourly) ? data.hourly : [];
       const tz = data.station && data.station.timezone, isM = data.units === 'metric', tu = isM ? '°C' : '°F', wu = isM ? 'km/h' : 'mph';
       const today = daily[0] || null, tomorrow = daily[1] || null;
       const nowSec = Math.floor(Date.now() / 1000), nowHr = getStationHour(tz);
+      const intro = getTimeOfDayIntro(nowHr);
       const todayKey = getLocalDateKey(nowSec, tz), tomorrowKey = getLocalDateKey(nowSec + 86400, tz);
       const hrOf = (ep) => {
         try { const h = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: tz || undefined }).format(new Date(ep * 1000))); return Number.isNaN(h) ? new Date(ep * 1000).getHours() : h % 24; }
@@ -2273,7 +2281,8 @@
         parts.push(`${eveIntro} ${eveSky}${tempClause}${eveRain},`);
       }
       const todayLo = today && typeof today.low === 'number' ? Math.round(today.low) : typeof cur.todayLow === 'number' ? Math.round(cur.todayLow) : null;
-      const nightLo = (overnight && overnight.minTemp !== null) ? overnight.minTemp : todayLo;
+      const nextNightLo = nowHr >= 18 && tomorrow && typeof tomorrow.low === 'number' ? Math.round(tomorrow.low) : todayLo;
+      const nightLo = (overnight && overnight.minTemp !== null) ? overnight.minTemp : nextNightLo;
       const nightSky = skyDesc((overnight && overnight.cond) || (nowHr < 12 && today && today.conditions) || curCond, true);
       const nightPop = (overnight && overnight.maxPop) || 0;
       const nightRain = nightPop >= 30 ? ` and a ${nightPop}% chance of showers` : '';
@@ -2291,9 +2300,9 @@
       return `${intro}${parts.join(' ')}`;
     }
 
-    function formatIndieForecastScript(rawText) {
+    function formatIndieForecastScript(rawText, tz) {
       const clean = String(rawText || '').trim().replace(/\s+/g, ' ');
-      const intro = "Hi, I'm Indie, your Morro Bay Alta Court weather girl. Today's forecast calls for ";
+      const intro = getTimeOfDayIntro(getStationHour(tz));
       const outro = 'Here are the current detailed conditions on Alta Court along with a 10-day Forecast. I hope you have a great rest of your day.';
       if (!clean) return `${intro}mild coastal weather. ${outro}`;
       if (/^hi,\s*i['’]m indie/i.test(clean)) return /great rest of your day/i.test(clean) ? clean : `${clean.replace(/\.?\s*$/, '.')} ${outro}`;
