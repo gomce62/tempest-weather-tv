@@ -8,6 +8,9 @@ on:
       - master
     paths:
       - 'google-sites-embed.html'
+      - 'public/manifest.webmanifest'
+      - 'public/sw.js'
+      - 'public/icons/**'
       - '.github/workflows/deploy-pages.yml'
 
 permissions:
@@ -30,8 +33,11 @@ jobs:
 
       - name: Stage GitHub Pages site
         run: |
-          mkdir -p _site
+          mkdir -p _site/icons
           cp google-sites-embed.html _site/index.html
+          cp public/manifest.webmanifest _site/manifest.webmanifest
+          cp public/sw.js _site/sw.js
+          cp public/icons/*.png _site/icons/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
