@@ -1088,7 +1088,7 @@ export class WeatherAvatarController {
     }
     if (this.btnToggleSpeak) {
       this.btnToggleSpeak.textContent = isSpeaking
-        ? 'Stop Broadcast'
+        ? 'Stop Briefing'
         : this.hasPlayedOnce
           ? 'Replay Briefing'
           : 'Play Briefing';
